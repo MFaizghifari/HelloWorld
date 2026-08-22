@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Todo</h1>
+      <p class="app__count" id="count">No tasks yet</p>
+    </header>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <input
+        class="composer__input"
+        id="new-task"
+        type="text"
+        placeholder="What needs to be done?"
+        aria-label="New task"
+        maxlength="200"
+        required>
+      <button class="composer__add" type="submit">Add</button>
+    </form>
+
+    <div class="filters" role="group" aria-label="Filter tasks">
+      <button class="filters__btn is-active" type="button" data-filter="all">All</button>
+      <button class="filters__btn" type="button" data-filter="active">Active</button>
+      <button class="filters__btn" type="button" data-filter="done">Done</button>
+    </div>
+
+    <ul class="list" id="list"></ul>
+
+    <p class="empty" id="empty" hidden></p>
+
+    <footer class="app__footer">
+      <button class="link-btn" type="button" id="clear-done">Clear completed</button>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
