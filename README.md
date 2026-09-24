@@ -84,7 +84,7 @@ Buka URL itu, klik **Pengaturan**, lalu isi admin key. Backend "Cloudflare D1" s
 
 1. Google Cloud Console → buat project → aktifkan **Google Sheets API** → buat **Service Account** → Keys → *Add key* → JSON.
 2. Simpan `client_email` dan `private_key` dari file JSON itu sebagai secret `GOOGLE_SERVICE_ACCOUNT_EMAIL` dan `GOOGLE_PRIVATE_KEY`.
-3. Per form: buat Google Sheet kosong, **Share** ke email service account sebagai Editor, lalu tempel link-nya di builder → *Tracking & Integrasi* → *Salinan ke Google Sheets*.
+3. Per form: buat Google Sheet kosong, **Share** ke email service account sebagai Editor, lalu tempel link-nya di builder → tab *Integrasi* → kartu *Kirim jawaban ke* → *Link Google Sheet*.
 
 Cron Worker berjalan tiap 5 menit dan mengirim sampai 500 baris per form per putaran lewat `values:append`. Nilai ditulis dengan `valueInputOption=RAW`, jadi jawaban seperti `=IMPORTXML(...)` tidak pernah dieksekusi sebagai rumus. Kalau gagal (mis. Sheet belum di-share), baris tetap di D1, dicoba lagi di putaran berikutnya, dan status error-nya tampil di dashboard. D1 tetap jadi sumber data utama. Kalau Sheet sudah terlalu besar, cukup ganti link ke Sheet baru, dan jawaban berikutnya akan masuk ke sana.
 

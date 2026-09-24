@@ -82,6 +82,13 @@ export function applyTheme(root, theme) {
   return t;
 }
 
+/** The form owner's logo (theme.logoUrl), pinned to the top-left like Typeform. */
+export function brandLogo(theme = {}) {
+  const url = theme.logoUrl;
+  if (!url || !/^https:\/\//.test(url)) return null;
+  return el('img', { class: 'ff-logo', src: url.replace(/["\\]/g, ''), alt: '' });
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 export function questionNumber(form, q) {
   const list = (form.questions || []).filter((x) => x.type !== 'statement');
@@ -534,7 +541,8 @@ export function welcomeScreen(form, ctx) {
           ? el('div', { class: 'ff-btn' }, editableText(btnLabel, { tag: 'span', placeholder: 'Mulai', onChange: set('buttonText') }))
           : okButton(btnLabel, () => ctx.start(), { withIcon: false }),
         hint('tekan', 'Enter ↵')),
-      el('div', { class: 'ff-time' }, icon('clock', { size: 16 }), `Butuh waktu ${estimateMinutes(form)} menit`)),
+      el('div', { class: 'ff-time' }, icon('clock', { size: 15 }),
+        `${(form.questions || []).filter((q) => q.type !== 'statement').length} pertanyaan · sekitar ${estimateMinutes(form)} menit`)),
     focus: () => {},
     onKey: (e) => { if (e.key === 'Enter' && !edit) { e.preventDefault(); ctx.start(); return true; } return false; },
   };
@@ -546,6 +554,7 @@ export function thankYouScreen(form, ctx) {
   const set = (k) => (v) => { t[k] = v; ctx.onEdit(); };
   return {
     el: el('section', { class: 'ff-screen ff-ending' },
+      el('div', { class: 'ff-done', 'aria-hidden': 'true' }, icon('check', { size: 28 })),
       text(ctx, t.title || 'Terima kasih!', { tag: 'h1', className: 'ff-title ff-title-xl', placeholder: 'Judul halaman akhir', onChange: set('title') }),
       text(ctx, t.description, { tag: 'p', className: 'ff-desc', placeholder: 'Deskripsi (opsional)', multiline: true, onChange: set('description') }),
       t.buttonText && (edit || /^https?:\/\//.test(t.buttonUrl || ''))
@@ -598,6 +607,7 @@ export function questionScreen(form, q, ctx) {
       el('h2', { class: 'ff-title', id: `t_${q.id}` },
         text(ctx, q.title, { tag: 'span', className: 'ff-title-text', placeholder: 'Tulis pertanyaan di sini…', onChange: (v) => { q.title = v; ctx.onEdit(); } }),
         q.required && q.type !== 'statement' ? el('span', { class: 'ff-req', text: '*' }) : null)),
+    edit ? el('div', { class: 'ff-edit-hint' }, 'Ketik ', el('kbd', { text: '@' }), ' untuk menyisipkan jawaban sebelumnya') : null,
     text(ctx, q.description, { tag: 'p', className: 'ff-desc', placeholder: 'Deskripsi (opsional)', multiline: true, onChange: (v) => { q.description = v; ctx.onEdit(); } }),
     layout === 'stack' ? el('img', { class: 'ff-q-img', src: q.imageUrl, alt: '' }) : null,
     input.el ? el('div', { class: 'ff-input' }, input.el) : null,

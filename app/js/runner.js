@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import {
   END, firstQuestionId, nextQuestionId, validateAnswer, progress, uid, interpolate, partialsEnabled, contactFrom, DEFAULT_CONSENT_TEXT,
 } from './logic.js';
-import { applyTheme, welcomeScreen, questionScreen, thankYouScreen } from './renderer.js';
+import { applyTheme, welcomeScreen, questionScreen, thankYouScreen, brandLogo } from './renderer.js';
 import { createTracker, newEventId, fbIdentifiers } from './tracking.js';
 
 const AUTO_HIDDEN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
@@ -281,6 +281,8 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
 
   // ─── Start ────────────────────────────────────────────────────────────────
   applyTheme(root, form.theme);
+  const logo = brandLogo(form.theme);
+  if (logo) root.append(logo);
   const saved = form.questions?.length ? loadProgress() : null;
   // Resuming continues the same session, so the funnel counts this visitor once.
   if (saved) state.sessionId = saved.sessionId;

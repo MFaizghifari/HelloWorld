@@ -8,11 +8,12 @@ import {
   END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle, nextQuestionId, partialsEnabled, DEFAULT_CONSENT_TEXT, PARTIAL_RETENTION_DAYS,
 } from './logic.js';
 import {
-  applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen,
+  applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen, brandLogo,
 } from './renderer.js';
 import { ID_PATTERNS, FB_STANDARD_EVENTS } from './tracking.js';
 import { mountForm } from './runner.js';
 import { mountResults } from './results.js';
+import { TYPE_META, typeTile } from './types.js';
 
 const panel = document.getElementById('panel');
 const picker = document.getElementById('formPicker');
@@ -35,20 +36,6 @@ const state = {
 };
 
 // ─── Question type catalogue (colours follow Typeform's category grouping) ──
-const TYPE_META = {
-  email: { cat: 'contact', color: '#FCE7F3', ink: '#9D174D' },
-  phone: { cat: 'contact', color: '#FCE7F3', ink: '#9D174D' },
-  short_text: { cat: 'text', color: '#DBEAFE', ink: '#1E40AF' },
-  long_text: { cat: 'text', color: '#DBEAFE', ink: '#1E40AF' },
-  statement: { cat: 'text', color: '#E5E7EB', ink: '#374151' },
-  multiple_choice: { cat: 'choice', color: '#EDE9FE', ink: '#5B21B6' },
-  dropdown: { cat: 'choice', color: '#EDE9FE', ink: '#5B21B6' },
-  yes_no: { cat: 'choice', color: '#EDE9FE', ink: '#5B21B6' },
-  rating: { cat: 'rating', color: '#FEF3C7', ink: '#92400E' },
-  opinion_scale: { cat: 'rating', color: '#FEF3C7', ink: '#92400E' },
-  number: { cat: 'other', color: '#D1FAE5', ink: '#065F46' },
-  date: { cat: 'other', color: '#D1FAE5', ink: '#065F46' },
-};
 const CATEGORIES = [
   ['contact', 'Info kontak'], ['choice', 'Pilihan'], ['text', 'Teks'], ['rating', 'Rating & skala'], ['other', 'Lainnya'],
 ];
@@ -58,10 +45,38 @@ const TYPE_HELP = {
   yes_no: 'Dua pilihan cepat', rating: 'Bintang 3–10', opinion_scale: 'Skala angka, NPS', number: 'Angka dengan batas', date: 'Hari / bulan / tahun',
 };
 
-function typeTile(type, label) {
-  const m = TYPE_META[type] || { color: '#E5E7EB', ink: '#374151' };
-  return el('span', { class: 'type-tile', style: `background:${m.color};color:${m.ink}` }, icon(type, { size: 14 }), label !== undefined ? el('span', { text: String(label) }) : null);
+// Longer help and a realistic sample for the "Tambah konten" preview pane.
+const TYPE_DESC = {
+  email: 'Kolom email dengan validasi format. Cocok sebagai kontak utama.',
+  phone: 'Nomor telepon dengan pilihan kode negara, default +62.',
+  short_text: 'Jawaban satu baris, misalnya nama atau jabatan.',
+  long_text: 'Jawaban panjang. Responden memakai Shift + Enter untuk baris baru.',
+  statement: 'Teks informasi tanpa jawaban, misalnya jadwal atau aturan kelas.',
+  multiple_choice: 'Satu atau beberapa pilihan. Responden bisa menjawab dengan tombol A, B, C.',
+  dropdown: 'Daftar panjang yang bisa dicari, misalnya kota atau kampus.',
+  yes_no: 'Dua pilihan cepat: tombol Y untuk Ya, N untuk Tidak.',
+  rating: 'Bintang 3 sampai 10. Rata-rata dan sebarannya muncul di Hasil.',
+  opinion_scale: 'Skala angka. Skala 0 sampai 10 otomatis dihitung NPS di Hasil.',
+  number: 'Angka dengan batas minimum dan maksimum.',
+  date: 'Tanggal dengan format HH / BB / TTTT.',
+};
+const SAMPLE = {
+  email: 'Apa email Anda?', phone: 'Nomor WhatsApp yang bisa dihubungi?', short_text: 'Siapa nama Anda?',
+  long_text: 'Apa yang ingin Anda pelajari di kelas ini?', statement: 'Kelas dimulai pukul 19.00 WIB lewat Zoom.',
+  multiple_choice: 'Apa status Anda saat ini?', dropdown: 'Di kota mana Anda tinggal?', yes_no: 'Bersedia dihubungi lewat WhatsApp?',
+  rating: 'Seberapa puas dengan kelas sebelumnya?', opinion_scale: 'Seberapa mungkin Anda merekomendasikan kami?',
+  number: 'Berapa jumlah karyawan di bisnis Anda?', date: 'Kapan tanggal lahir Anda?',
+};
+
+function sampleQuestion(type) {
+  const q = newQuestion(type);
+  q.title = SAMPLE[type];
+  if (type === 'multiple_choice') q.options = ['Mahasiswa', 'Karyawan', 'Pemilik bisnis'].map((label) => ({ id: uid('o'), label }));
+  if (type === 'dropdown') q.options = ['Jakarta', 'Bandung', 'Surabaya'].map((label) => ({ id: uid('o'), label }));
+  if (type === 'opinion_scale') Object.assign(q.settings, { labelLeft: 'Tidak mungkin', labelRight: 'Sangat mungkin' });
+  return q;
 }
+
 
 // ─── Templates ──────────────────────────────────────────────────────────────
 function defaultTheme() {
@@ -282,11 +297,11 @@ function renderSidebar() {
   const special = (id, iconName, label, sub, off) => el('li', {
     class: `bw-item bw-special${state.selected === id ? ' active' : ''}${off ? ' off' : ''}`, tabindex: 0,
     onclick: () => select(id), onkeydown: (e) => { if (e.key === 'Enter') select(id); },
-  }, el('span', { class: 'type-tile', style: 'background:#E5E7EB;color:#374151' }, icon(iconName, { size: 14 })),
+  }, el('span', { class: 'type-tile neutral' }, icon(iconName, { size: 14 })),
   el('span', { class: 'bw-item-title' }, el('span', { text: label }), sub ? el('small', { text: sub }) : null));
 
   return el('aside', { class: 'bw-left' },
-    el('button', { class: 'btn add-btn', type: 'button', onclick: openAddDialog }, icon('plus', { size: 16 }), 'Tambah konten'),
+    el('button', { class: 'btn-soft add-btn', type: 'button', onclick: openAddDialog }, icon('plus', { size: 16 }), 'Tambah konten'),
     el('div', { class: 'bw-scroll' },
       el('ul', { class: 'bw-list' }, special('welcome', 'welcome', 'Halaman pembuka', w.enabled === false ? 'nonaktif' : plainTitle(w.title || f.title), w.enabled === false)),
       el('div', { class: 'bw-list-title', text: `Pertanyaan (${f.questions.length})` }),
@@ -331,6 +346,22 @@ async function remove(q) {
 }
 
 // ─── Add-content dialog ─────────────────────────────────────────────────────
+/** Renders a sample of the question type with the form's own theme, like Typeform's picker. */
+function showAddPreview(type) {
+  const host = document.getElementById('addPreview');
+  document.querySelectorAll('#addGrid .add-item').forEach((b) => b.classList.toggle('is-preview', b.dataset.type === type));
+  const q = sampleQuestion(type);
+  const root = el('div', { class: 'ff' });
+  applyTheme(root, state.form.theme);
+  const screen = questionScreen({ ...state.form, questions: [q] }, q, { mode: 'live', answers: {}, hidden: {}, isLast: false, onSubmit: () => {} });
+  root.append(el('div', { class: 'ff-stage' }, screen.el));
+  host.replaceChildren(
+    el('div', { class: 'add-preview-frame', inert: true, 'aria-hidden': 'true' }, root),
+    el('div', { class: 'row', style: 'gap:10px' }, typeTile(type), el('h3', { text: QUESTION_TYPES[type].label })),
+    el('p', { text: TYPE_DESC[type] }),
+    el('p', {}, 'Klik untuk menambahkan setelah pertanyaan yang sedang dipilih.'));
+}
+
 function openAddDialog() {
   const dlg = document.getElementById('addDialog');
   const search = document.getElementById('addSearch');
@@ -342,13 +373,20 @@ function openAddDialog() {
         .filter((t) => !term || QUESTION_TYPES[t].label.toLowerCase().includes(term) || TYPE_HELP[t].toLowerCase().includes(term));
       if (!types.length) return null;
       return el('section', { class: 'add-cat' }, el('h3', { text: label }), types.map((t) => el('button', {
-        type: 'button', class: 'add-item', onclick: () => { addQuestion(t); dlg.close(); },
+        type: 'button', class: 'add-item', 'data-type': t,
+        onclick: () => { addQuestion(t); dlg.close(); },
+        onmouseenter: () => showAddPreview(t), onfocus: () => showAddPreview(t),
       }, typeTile(t), el('span', { class: 'add-item-text' }, el('strong', { text: QUESTION_TYPES[t].label }), el('small', { text: TYPE_HELP[t] })))));
     }).filter(Boolean));
+    const first = grid.querySelector('.add-item');
+    if (first) showAddPreview(first.dataset.type);
+    else {
+      document.getElementById('addPreview').replaceChildren(el('p', { text: `Tidak ada jenis pertanyaan untuk "${search.value.trim()}".` }));
+    }
   };
   search.value = '';
   search.oninput = draw;
-  search.onkeydown = (e) => { if (e.key === 'Enter') grid.querySelector('.add-item')?.click(); };
+  search.onkeydown = (e) => { if (e.key === 'Enter') grid.querySelector('.add-item.is-preview, .add-item')?.click(); };
   draw();
   dlg.showModal();
   search.focus();
@@ -407,16 +445,36 @@ function renderCanvas() {
   }
   stage.append(screen.el);
   root.append(stage);
+  const logo = brandLogo(f.theme);
+  if (logo) root.append(logo);
   host.replaceChildren(root);
 }
 
+/** Welcome, every question, ending: the order the canvas arrows step through. */
+function canvasOrder() {
+  return ['welcome', ...state.form.questions.map((q) => q.id), 'ending'];
+}
+
+function canvasWhere() {
+  const f = state.form;
+  if (state.selected === 'welcome') return [el('span', { class: 'type-tile neutral' }, icon('welcome', { size: 14 })), f.welcome?.enabled === false ? 'Halaman pembuka (nonaktif)' : 'Halaman pembuka'];
+  if (state.selected === 'ending') return [el('span', { class: 'type-tile neutral' }, icon('ending', { size: 14 })), 'Halaman akhir'];
+  const i = f.questions.findIndex((q) => q.id === state.selected);
+  const q = f.questions[i];
+  return [typeTile(q.type), `Pertanyaan ${i + 1} dari ${f.questions.length}`];
+}
+
 function renderCenter() {
-  const w = state.form.welcome || {};
+  const order = canvasOrder();
+  const at = order.indexOf(state.selected);
+  const step = (d) => { const id = order[at + d]; if (id) select(id); };
   return el('section', { class: 'bw-center' },
     el('div', { class: 'bw-canvas-bar' },
-      segmented([['desktop', 'Desktop'], ['mobile', 'Ponsel']], state.device, (v) => { state.device = v; render(); }),
-      state.selected === 'welcome' && w.enabled === false ? el('span', { class: 'muted small', text: 'Halaman pembuka nonaktif — responden langsung ke pertanyaan 1.' }) : el('span', { class: 'muted small', text: 'Klik teks di kanvas untuk mengedit langsung · ketik @ untuk menyisipkan jawaban' }),
-      el('button', { class: `btn-ghost small${state.side === 'design' ? ' active' : ''}`, type: 'button', onclick: () => { state.side = state.side === 'design' ? 'settings' : 'design'; render(); } }, icon('palette', { size: 16 }), 'Desain')),
+      el('div', {}, segmented([['desktop', 'Desktop'], ['mobile', 'Ponsel']], state.device, (v) => { state.device = v; render(); })),
+      el('div', { class: 'canvas-where', 'aria-live': 'polite' }, canvasWhere()),
+      el('div', { class: 'canvas-nav' },
+        el('button', { class: 'icon-btn sm', type: 'button', title: 'Sebelumnya', 'aria-label': 'Layar sebelumnya', disabled: at <= 0, onclick: () => step(-1) }, icon('chevronUp', { size: 18 })),
+        el('button', { class: 'icon-btn sm', type: 'button', title: 'Berikutnya', 'aria-label': 'Layar berikutnya', disabled: at >= order.length - 1, onclick: () => step(1) }, icon('chevronDown', { size: 18 })))),
     el('div', { class: 'bw-canvas' }, el('div', { class: `bw-frame ${state.device}` })));
 }
 
@@ -457,15 +515,18 @@ function questionSettings(q) {
     opts.append(toggle('Acak urutan pilihan', s, 'randomize', { hint: 'Hanya berlaku untuk responden' }), toggle('Susun horizontal', s, 'horizontal'));
   }
   if (t === 'multiple_choice' || t === 'dropdown') {
-    opts.append(field('Tambah banyak pilihan sekaligus', el('textarea', {
-      rows: 3, placeholder: 'Satu pilihan per baris, lalu klik di luar kotak',
-      onchange: (e) => {
-        const lines = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean);
-        if (!lines.length) return;
-        (q.options ||= []).push(...lines.map((label) => ({ id: uid('o'), label })));
-        markDirty(); render();
-      },
-    })));
+    opts.append(el('details', { class: 'bulk' },
+      el('summary', { text: 'Tempel banyak pilihan sekaligus' }),
+      el('textarea', {
+        rows: 4, placeholder: 'Satu pilihan per baris', 'aria-label': 'Pilihan, satu per baris',
+        onchange: (e) => {
+          const lines = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean);
+          if (!lines.length) return;
+          (q.options ||= []).push(...lines.map((label) => ({ id: uid('o'), label })));
+          markDirty(); render();
+          toast(`${lines.length} pilihan ditambahkan`);
+        },
+      })));
   }
   if (['short_text', 'long_text', 'email', 'number'].includes(t)) opts.append(field('Placeholder', bind(s, 'placeholder', { canvas: true })));
   if (t === 'short_text' || t === 'long_text') opts.append(field('Batas karakter', bind(s, 'maxLength', { type: 'number', placeholder: t === 'short_text' ? '500' : '5000' })));
@@ -483,7 +544,7 @@ function questionSettings(q) {
   if (t === 'statement') opts.append(field('Teks tombol', bind(s, 'buttonText', { canvas: true, placeholder: 'Lanjut' })));
   parts.push(opts, imageSection(q));
   parts.push(el('div', { class: 'rp-section rp-footer' },
-    el('small', { class: 'muted', text: `ID: ${q.id}` }),
+    el('span', { class: 'rp-id', title: 'Dipakai untuk {{id}} dan kolom data', text: `ID ${q.id}` }),
     el('div', { class: 'row' },
       el('button', { class: 'btn-ghost small', type: 'button', onclick: () => duplicate(q) }, icon('copy', { size: 14 }), 'Duplikat'),
       el('button', { class: 'btn-ghost small danger', type: 'button', onclick: () => remove(q) }, icon('trash', { size: 14 }), 'Hapus'))));
@@ -544,6 +605,8 @@ function designPanel() {
       selectEl(Object.keys(FONTS).map((k) => [k, k]), t.font, (v) => { set('font', true)(v); })),
     el('div', { class: 'rp-section' }, el('h4', { text: 'Warna' }),
       color('Pertanyaan', 'question'), color('Jawaban', 'answer'), color('Tombol', 'button'), color('Teks tombol', 'buttonText'), color('Latar', 'background')),
+    el('div', { class: 'rp-section' }, el('h4', { text: 'Logo' }),
+      field('URL logo (https)', bind(t, 'logoUrl', { type: 'url', canvas: true, placeholder: 'https://…/logo.png' }), 'Tampil di pojok kiri atas setiap layar. PNG/SVG transparan, tinggi maksimal 36px.')),
     el('div', { class: 'rp-section' }, el('h4', { text: 'Gambar latar' }),
       field('URL gambar (https)', bind(t, 'backgroundImage', { type: 'url', canvas: true, placeholder: 'https://…' })),
       t.backgroundImage ? field('Kecerahan', el('input', { type: 'range', min: -80, max: 80, step: 5, value: t.brightness, oninput: (e) => set('brightness')(Number(e.target.value)) }), 'Geser kiri untuk menggelapkan, kanan untuk mencerahkan.') : null),
@@ -577,76 +640,107 @@ function renderContent() {
 function renderLogic() {
   const f = state.form;
   const problems = findLogicProblems(f);
-  const fieldOptions = [
-    ...f.questions.filter((q) => q.type !== 'statement').map((q) => [q.id, qLabel(q, f.questions.indexOf(q))]),
-    ...(f.hiddenFields || []).map((h) => [h, `Parameter URL: ${h}`]),
-  ];
-  const targetsFor = (idx) => [
-    ...f.questions.map((q, i) => [q.id, qLabel(q, i)]).filter((_, i) => i !== idx),
-    [END, 'Halaman akhir (kirim form)'],
-  ];
-
   return el('div', { class: 'bw-page' },
     el('div', { class: 'page-head' },
       el('h1', { text: 'Logika' }),
-      el('p', { class: 'muted', text: 'Arahkan responden ke pertanyaan berbeda berdasarkan jawabannya. Aturan dicek dari atas ke bawah; aturan pertama yang cocok menentukan lompatan. Jika tidak ada yang cocok, responden lanjut ke "Selalu lompat ke" atau pertanyaan berikutnya.' })),
+      el('p', { text: 'Arahkan responden ke pertanyaan lain berdasarkan jawabannya. Aturan dicek dari atas ke bawah, dan aturan pertama yang cocok yang dipakai.' })),
     problems.length ? el('div', { class: 'callout warn' }, el('strong', { text: 'Perlu dicek' }), el('ul', {}, problems.map((p) => el('li', { text: p })))) : null,
-    f.questions.map((q, idx) => el('section', { class: `logic-card${(q.logic || []).length ? ' has-rules' : ''}` },
-      el('div', { class: 'logic-head' }, typeTile(q.type, q.type === 'statement' ? undefined : questionNumber(f, q)), el('h3', { text: questionTitle(q) })),
-      (q.logic || []).map((rule, ri) => el('div', { class: 'rule' },
-        el('div', { class: 'rule-row' },
-          el('span', { class: 'rule-kw', text: 'Jika' }),
-          selectEl([['all', 'semua kondisi terpenuhi'], ['any', 'salah satu kondisi terpenuhi']], rule.match || 'all', (v) => { rule.match = v; markDirty(); }),
-          el('button', { class: 'icon-btn sm danger push', type: 'button', title: 'Hapus aturan', 'aria-label': 'Hapus aturan', onclick: () => { q.logic.splice(ri, 1); markDirty(); render(); } }, icon('trash', { size: 14 }))),
-        (rule.conditions || []).map((c, ci) => {
-          const src = f.questions.find((x) => x.id === c.field);
-          const needsValue = !['answered', 'not_answered'].includes(c.op);
-          let valueControl = null;
-          if (needsValue) {
-            if (src && (QUESTION_TYPES[src.type]?.choices || src.type === 'yes_no')) {
-              const opts = src.type === 'yes_no' ? ['Ya', 'Tidak'] : (src.options || []).map((o) => o.label);
-              valueControl = selectEl([['', 'pilih…'], ...opts.map((o) => [o, o])], c.value, (v) => { c.value = v; markDirty(); });
-            } else {
-              valueControl = bind(c, 'value', { placeholder: 'nilai' });
-            }
-          }
-          return el('div', { class: 'rule-row cond' },
-            selectEl(fieldOptions, c.field, (v) => { c.field = v; c.value = ''; markDirty(); render(); }),
-            selectEl(Object.entries(OPERATORS), c.op, (v) => { c.op = v; markDirty(); render(); }),
-            valueControl,
-            el('button', { class: 'icon-btn sm', type: 'button', title: 'Hapus kondisi', 'aria-label': 'Hapus kondisi', onclick: () => { rule.conditions.splice(ci, 1); markDirty(); render(); } }, icon('close', { size: 14 })));
-        }),
-        el('button', { class: 'link-btn', type: 'button', onclick: () => { rule.conditions.push({ field: q.id, op: 'eq', value: '' }); markDirty(); render(); } }, icon('plus', { size: 14 }), 'kondisi'),
-        el('div', { class: 'rule-row' }, el('span', { class: 'rule-kw', text: 'Lompat ke' }),
-          selectEl([['', 'pilih tujuan…'], ...targetsFor(idx)], rule.goto || '', (v) => { rule.goto = v; markDirty(); render(); })))),
-      el('div', { class: 'rule-row logic-foot' },
-        el('button', { class: 'btn-ghost small', type: 'button', onclick: () => {
-          (q.logic ||= []).push({ match: 'all', conditions: q.type === 'statement' ? [] : [{ field: q.id, op: 'eq', value: '' }], goto: '' });
-          markDirty(); render();
-        } }, icon('plus', { size: 14 }), 'Tambah aturan'),
-        el('span', { class: 'muted small push', text: 'Selalu lompat ke' }),
-        selectEl([['', 'pertanyaan berikutnya'], ...targetsFor(idx)], q.next || '', (v) => { if (v) q.next = v; else delete q.next; markDirty(); })))));
+    el('div', { class: 'logic-list' }, f.questions.map((q, idx) => logicItem(q, idx))));
+}
+
+function logicTargets(idx) {
+  const f = state.form;
+  return [
+    ...f.questions.map((q, i) => [q.id, qLabel(q, i)]).filter((_, i) => i !== idx),
+    [END, 'Halaman akhir (kirim form)'],
+  ];
+}
+
+function logicItem(q, idx) {
+  const f = state.form;
+  const rules = q.logic || [];
+  const nextSelect = selectEl([['', 'pertanyaan berikutnya'], ...logicTargets(idx)], q.next || '', (v) => { if (v) q.next = v; else delete q.next; markDirty(); },
+    { class: 'pill-select', 'aria-label': `Selain itu, setelah "${questionTitle(q)}" lanjut ke` });
+  const addRule = () => {
+    (q.logic ||= []).push({ match: 'all', conditions: q.type === 'statement' ? [] : [{ field: q.id, op: 'eq', value: '' }], goto: '' });
+    markDirty(); render();
+  };
+  const head = el('div', { class: 'logic-row' },
+    typeTile(q.type, q.type === 'statement' ? undefined : questionNumber(f, q)),
+    el('h3', { text: questionTitle(q) }),
+    rules.length ? null : el('span', { class: 'logic-next' }, 'lanjut ke', nextSelect),
+    el('button', { class: 'btn-soft small', type: 'button', onclick: addRule }, icon('plus', { size: 14 }), 'Aturan'));
+  if (!rules.length) return head;
+  return el('section', { class: 'logic-card' }, head,
+    el('div', { class: 'rules' }, rules.map((rule, ri) => ruleBlock(q, rule, ri, idx))),
+    el('div', { class: 'rule-else' }, el('span', { text: 'Selain itu, lanjut ke' }), nextSelect));
+}
+
+/** One rule, written as a sentence: Jika [field] [op] [value] dan … lompat ke [target]. */
+function ruleBlock(q, rule, ri, idx) {
+  const f = state.form;
+  const fieldOptions = [
+    ...f.questions.filter((x) => x.type !== 'statement').map((x) => [x.id, qLabel(x, f.questions.indexOf(x))]),
+    ...(f.hiddenFields || []).map((h) => [h, `Parameter URL: ${h}`]),
+  ];
+  const conds = rule.conditions || [];
+  const condLine = (c, ci) => {
+    const src = f.questions.find((x) => x.id === c.field);
+    let value = null;
+    if (!['answered', 'not_answered'].includes(c.op)) {
+      if (src && (QUESTION_TYPES[src.type]?.choices || src.type === 'yes_no')) {
+        const opts = src.type === 'yes_no' ? ['Ya', 'Tidak'] : (src.options || []).map((o) => o.label);
+        value = selectEl([['', 'pilih…'], ...opts.map((o) => [o, o])], c.value, (v) => { c.value = v; markDirty(); }, { class: 'pill-select', 'aria-label': 'Nilai' });
+      } else {
+        value = el('input', { class: 'pill-input', value: c.value ?? '', placeholder: 'nilai', 'aria-label': 'Nilai', oninput: (e) => { c.value = e.target.value; markDirty(); } });
+      }
+    }
+    return el('div', { class: 'rule-line' },
+      ci === 0
+        ? el('span', { class: 'rule-kw strong', text: 'Jika' })
+        : selectEl([['all', 'dan'], ['any', 'atau']], rule.match || 'all', (v) => { rule.match = v; markDirty(); render(); }, { class: 'pill-select', 'aria-label': 'Gabungkan kondisi dengan' }),
+      selectEl(fieldOptions, c.field, (v) => { c.field = v; c.value = ''; markDirty(); render(); }, { class: 'pill-select', 'aria-label': 'Pertanyaan' }),
+      selectEl(Object.entries(OPERATORS), c.op, (v) => { c.op = v; markDirty(); render(); }, { class: 'pill-select', 'aria-label': 'Operator' }),
+      value,
+      conds.length > 1 ? el('button', { class: 'icon-btn sm', type: 'button', title: 'Hapus kondisi', 'aria-label': 'Hapus kondisi', onclick: () => { conds.splice(ci, 1); markDirty(); render(); } }, icon('close', { size: 14 })) : null);
+  };
+  return el('div', { class: 'rule' },
+    el('button', { class: 'icon-btn sm danger rule-del', type: 'button', title: 'Hapus aturan', 'aria-label': `Hapus aturan ${ri + 1}`, onclick: () => { q.logic.splice(ri, 1); markDirty(); render(); } }, icon('trash', { size: 14 })),
+    conds.length ? conds.map(condLine) : el('div', { class: 'rule-line' }, el('span', { class: 'rule-kw strong', text: 'Selalu' })),
+    q.type === 'statement' ? null : el('button', { class: 'link-btn', type: 'button', onclick: () => { conds.push({ field: q.id, op: 'eq', value: '' }); rule.conditions = conds; markDirty(); render(); } }, icon('plus', { size: 14 }), 'Tambah kondisi'),
+    el('div', { class: 'rule-line' },
+      el('span', { class: 'rule-kw strong', text: 'maka lompat ke' }),
+      selectEl([['', 'pilih tujuan…'], ...logicTargets(idx)], rule.goto || '', (v) => { rule.goto = v; markDirty(); render(); }, { class: 'pill-select', 'aria-label': 'Lompat ke' })));
 }
 
 // ─── Connect tab ────────────────────────────────────────────────────────────
-function sheetCard(ig) {
-  if (backend.name === 'cloud') {
-    const sa = cloudInfo?.serviceAccountEmail;
-    return el('section', { class: 'card' },
-      el('h3', { text: 'Salinan ke Google Sheets' }),
-      el('p', { class: 'muted small', text: 'Jawaban disimpan di database Cloudflare D1, lalu disalin otomatis ke Google Sheet setiap 5 menit.' }),
-      el('ol', { class: 'small steps' },
-        el('li', { text: 'Buat Google Sheet kosong.' }),
-        el('li', {}, 'Klik Share → tambahkan ', sa ? el('code', { text: sa }) : el('em', { text: 'email service account (lihat README)' }), ' sebagai Editor.'),
-        el('li', { text: 'Tempel link Sheet-nya di bawah, lalu Terbitkan.' })),
-      sa ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { copyText(sa, 'Email service account disalin ✓'); }, text: 'Salin email service account' }) : null,
-      field('Link Google Sheet', bind(ig, 'sheetUrl', { type: 'url' }), 'Contoh: https://docs.google.com/spreadsheets/d/1AbC…/edit. Jawaban yang sudah masuk sebelum link diisi juga ikut disalin.'),
-      cloudInfo && !sa ? el('p', { class: 'bad small', text: 'Worker belum punya kredensial Google (GOOGLE_SERVICE_ACCOUNT_EMAIL & GOOGLE_PRIVATE_KEY).' }) : null);
-  }
+/** Where answers go besides the Results tab: Google Sheets, email, webhook. */
+function destinationsCard(ig) {
+  const sheet = backend.name === 'cloud'
+    ? (() => {
+      const sa = cloudInfo?.serviceAccountEmail;
+      return [
+        el('p', { class: 'muted small', text: 'Jawaban disimpan di database Cloudflare D1, lalu disalin otomatis ke Google Sheet setiap 5 menit.' }),
+        el('ol', { class: 'small steps' },
+          el('li', { text: 'Buat Google Sheet kosong.' }),
+          el('li', {}, 'Klik Share → tambahkan ', sa ? el('code', { text: sa }) : el('em', { text: 'email service account (lihat README)' }), ' sebagai Editor.'),
+          el('li', { text: 'Tempel link Sheet-nya di bawah, lalu Terbitkan.' })),
+        sa ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { copyText(sa, 'Email service account disalin ✓'); }, text: 'Salin email service account' }) : null,
+        field('Link Google Sheet', bind(ig, 'sheetUrl', { type: 'url' }), 'Contoh: https://docs.google.com/spreadsheets/d/1AbC…/edit. Jawaban yang sudah masuk sebelum link diisi juga ikut disalin.'),
+        cloudInfo && !sa ? el('p', { class: 'bad small', text: 'Worker belum punya kredensial Google (GOOGLE_SERVICE_ACCOUNT_EMAIL & GOOGLE_PRIVATE_KEY).' }) : null,
+      ];
+    })()
+    : [
+      field('Bagikan Sheet ke (email, pisahkan koma)', bind(ig, 'sheetEditors'), 'Diberi akses edit ke spreadsheet jawaban form ini saat disimpan.'),
+      el('h4', { class: 'card-sub sep', text: 'Notifikasi email' }),
+      field('Kirim ke (opsional)', bind(ig, 'notifyEmail', { type: 'email' }), 'Dikirim oleh Apps Script. Kuota Gmail: 100 email/hari (akun biasa), 1.500 (Workspace).'),
+    ];
   return el('section', { class: 'card' },
-    el('h3', { text: 'Google Sheet jawaban' }),
-    field('Bagikan Google Sheet ke (email, pisahkan koma)', bind(ig, 'sheetEditors'), 'Diberi akses edit ke spreadsheet jawaban form ini saat disimpan.'),
-    field('Email notifikasi (opsional)', bind(ig, 'notifyEmail', { type: 'email' }), 'Dikirim oleh Apps Script. Kuota Gmail: 100 email/hari (akun biasa), 1.500 (Workspace).'));
+    el('h3', { text: 'Kirim jawaban ke' }),
+    el('h4', { class: 'card-sub', text: 'Google Sheets' }),
+    sheet,
+    el('h4', { class: 'card-sub sep', text: 'Webhook' }),
+    field('URL (opsional)', bind(ig, 'webhookUrl', { type: 'url' }), 'Setiap jawaban baru di-POST (JSON) ke URL ini dari server: Make, Zapier, n8n, CRM, atau notifikasi Slack/Telegram.'));
 }
 
 function renderConnect() {
@@ -660,33 +754,33 @@ function renderConnect() {
   };
   return el('div', { class: 'bw-page' },
     el('div', { class: 'page-head' }, el('h1', { text: 'Integrasi' }), el('p', { class: 'muted', text: 'Tracking iklan, analytics, dan ke mana jawaban dikirim.' })),
+    // Two columns by job: ad tracking on the left, where answers go on the right.
     el('div', { class: 'grid2' },
-      el('section', { class: 'card' },
-        el('h3', { text: 'Meta Pixel & Conversions API' }),
-        field('Pixel ID', bind(tr, 'fbPixelId', { transform: (v) => v.trim() }), 'Angka 15–16 digit dari Events Manager.'),
-        validity('fbPixelId'),
-        field('Event saat form terkirim', selectEl(FB_STANDARD_EVENTS.map((e) => [e, e]), tr.fbSubmitEvent || 'Lead', (v) => { tr.fbSubmitEvent = v; markDirty(); })),
-        toggle('Event FormStep per pertanyaan', tr, 'stepEvents', { hint: 'Untuk analisa funnel di Ads Manager' }),
-        toggle('Conversions API (server-side)', tr, 'capi', { hint: 'Butuh backend Cloudflare atau Google Sheets' }),
-        el('p', { class: 'muted small', text: 'Event otomatis: PageView, FormStart, dan event submit di atas. Event submit dikirim dari browser + server dengan event_id yang sama sehingga Meta men-deduplikasi. Access token CAPI disimpan sebagai secret FB_CAPI_TOKEN (Worker) atau Script Property (Apps Script), bukan di sini.' })),
-      el('section', { class: 'card' },
-        el('h3', { text: 'Google Analytics 4 & Tag Manager' }),
-        field('GA4 Measurement ID', bind(tr, 'ga4Id', { transform: (v) => v.trim().toUpperCase() }), 'Format: G-XXXXXXXXXX'),
-        validity('ga4Id'),
-        field('GTM Container ID', bind(tr, 'gtmId', { transform: (v) => v.trim().toUpperCase() }), 'Format: GTM-XXXXXXX. Event dataLayer: form_start, form_step, form_submit.'),
-        validity('gtmId')),
-      el('section', { class: 'card' },
-        el('h3', { text: 'Hidden fields (UTM & parameter URL)' }),
-        el('p', { class: 'muted small', text: 'utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid, gclid selalu direkam otomatis. Tambahkan parameter lain (pisahkan koma), mis. ref, nama.' }),
-        el('input', {
-          type: 'text', value: (f.hiddenFields || []).join(', '),
-          onchange: (e) => { f.hiddenFields = e.target.value.split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)); markDirty(); render(); },
-        }),
-        el('p', { class: 'muted small', text: 'Sisipkan di teks dengan @ di kanvas, atau pakai sebagai kondisi di tab Logika.' })),
-      el('section', { class: 'card' },
-        el('h3', { text: 'Webhook' }),
-        field('Webhook URL (opsional)', bind(ig, 'webhookUrl', { type: 'url' }), 'Setiap jawaban baru di-POST (JSON) ke URL ini dari server: Make, Zapier, n8n, CRM, atau notifikasi Slack/Telegram.')),
-      sheetCard(ig),
+      el('div', { class: 'stack' },
+        el('section', { class: 'card' },
+          el('h3', { text: 'Meta Pixel & Conversions API' }),
+          field('Pixel ID', bind(tr, 'fbPixelId', { transform: (v) => v.trim() }), 'Angka 15–16 digit dari Events Manager.'),
+          validity('fbPixelId'),
+          field('Event saat form terkirim', selectEl(FB_STANDARD_EVENTS.map((e) => [e, e]), tr.fbSubmitEvent || 'Lead', (v) => { tr.fbSubmitEvent = v; markDirty(); })),
+          toggle('Event FormStep per pertanyaan', tr, 'stepEvents', { hint: 'Untuk analisa funnel di Ads Manager' }),
+          toggle('Conversions API (server-side)', tr, 'capi', { hint: 'Butuh backend Cloudflare atau Google Sheets' }),
+          el('p', { class: 'muted small', text: 'Event otomatis: PageView, FormStart, dan event submit di atas. Event submit dikirim dari browser + server dengan event_id yang sama sehingga Meta men-deduplikasi. Access token CAPI disimpan sebagai secret FB_CAPI_TOKEN (Worker) atau Script Property (Apps Script), bukan di sini.' })),
+        el('section', { class: 'card' },
+          el('h3', { text: 'Google Analytics 4 & Tag Manager' }),
+          field('GA4 Measurement ID', bind(tr, 'ga4Id', { transform: (v) => v.trim().toUpperCase() }), 'Format: G-XXXXXXXXXX'),
+          validity('ga4Id'),
+          field('GTM Container ID', bind(tr, 'gtmId', { transform: (v) => v.trim().toUpperCase() }), 'Format: GTM-XXXXXXX. Event dataLayer: form_start, form_step, form_submit.'),
+          validity('gtmId'))),
+      el('div', { class: 'stack' },
+        el('section', { class: 'card' },
+          el('h3', { text: 'Hidden fields (UTM & parameter URL)' }),
+          el('p', { class: 'muted small', text: 'utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid, gclid selalu direkam otomatis. Tambahkan parameter lain (pisahkan koma), mis. ref, nama.' }),
+          el('input', {
+            type: 'text', value: (f.hiddenFields || []).join(', '),
+            onchange: (e) => { f.hiddenFields = e.target.value.split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)); markDirty(); render(); },
+          }),
+          el('p', { class: 'muted small', text: 'Sisipkan di teks dengan @ di kanvas, atau pakai sebagai kondisi di tab Logika.' })),
+        destinationsCard(ig)),
       recoveryCard(f)));
 }
 
@@ -824,11 +918,15 @@ function render() {
   if (state.tab === 'results') {
     mountResults(panel.querySelector('.bw-page'), {
       backend, formId: state.form.id, form: state.form, canDownload: !DEMO,
-      demoNote: DEMO ? 'Data contoh: kunjungan dan jawaban fiktif dari 14 hari terakhir, supaya grafik terlihat. Isi form lewat tab Bagikan → "Isi form", dan jawaban Anda ikut masuk ke sini.' : '',
+      demoNote: DEMO ? 'Kunjungan dan jawaban fiktif dari 14 hari terakhir. Isi form lewat Bagikan → Isi form, dan jawaban Anda ikut masuk ke sini.' : '',
     });
   }
   if (document.activeElement !== titleInput) titleInput.value = state.form.title || '';
-  document.getElementById('backendPill').textContent = DEMO ? 'Pratinjau' : { cloud: 'Cloudflare D1', sheets: 'Google Sheets', local: 'Lokal (demo)' }[backend.name];
+  const store = document.getElementById('openSettings');
+  const label = DEMO ? 'Mode demo' : { cloud: 'Cloudflare', sheets: 'Google Sheets', local: 'Browser ini' }[backend.name];
+  store.replaceChildren(icon('database', { size: 14 }), el('span', { text: label }));
+  store.title = DEMO ? 'Pratinjau: data tersimpan di browser ini saja' : `Data tersimpan di: ${label}. Klik untuk mengubah.`;
+  if (DEMO) store.setAttribute('aria-disabled', 'true');
   updateStatus();
   loadCloudInfo();
 }
@@ -836,13 +934,16 @@ function render() {
 async function refreshPicker() {
   try { state.forms = await backend.listForms(); } catch (err) { state.forms = []; toast(err.message, 'bad'); }
   const known = state.forms.some((f) => f.id === state.form.id);
+  // The select always reads "Form saya"; the open form's name lives in the title field next to it.
+  const mark = (id) => (id === state.form.id ? '✓ ' : '\u2003');
   picker.replaceChildren(
+    el('option', { value: '__ws', hidden: true, text: 'Form saya' }),
     el('optgroup', { label: 'Form saya' },
-      ...(known ? [] : [el('option', { value: state.form.id, text: `${state.form.title || 'Tanpa judul'} (draf)` })]),
-      ...state.forms.map((f) => el('option', { value: f.id, selected: f.id === state.form.id, text: f.title || f.id }))),
+      ...(known ? [] : [el('option', { value: state.form.id, text: `${mark(state.form.id)}${state.form.title || 'Tanpa judul'} (draf)` })]),
+      ...state.forms.map((f) => el('option', { value: f.id, text: `${mark(f.id)}${f.title || f.id}` }))),
     el('option', { value: '__new', text: '＋ Buat form baru' }),
   );
-  picker.value = state.form.id;
+  picker.value = '__ws';
   state.sheetUrl = state.forms.find((f) => f.id === state.form.id)?.sheetUrl || state.sheetUrl;
 }
 
@@ -893,6 +994,7 @@ function setupSettings() {
   const form = document.getElementById('settingsForm');
   const toggleFields = () => form.querySelectorAll('[data-for]').forEach((n) => { n.hidden = n.dataset.for !== form.backend.value; });
   document.getElementById('openSettings').addEventListener('click', () => {
+    if (DEMO) { toast('Di pratinjau ini data tersimpan di browser Anda saja.'); return; }
     const cfg = getConfig();
     form.backend.value = cfg.backend;
     form.sheetsUrl.value = cfg.sheetsUrl || '';
@@ -935,7 +1037,6 @@ function resetOutdatedDemo() {
 }
 
 async function init() {
-  document.getElementById('openSettings').append(icon('settings', { size: 18 }));
   document.getElementById('preview').append(icon('eye', { size: 16 }), 'Pratinjau');
   document.getElementById('addClose').append(icon('close', { size: 18 }));
   document.getElementById('addClose').addEventListener('click', () => document.getElementById('addDialog').close());
@@ -944,16 +1045,16 @@ async function init() {
   document.getElementById('save').addEventListener('click', save);
   setupPreview();
   document.getElementById('preview').addEventListener('click', () => openPreview(false));
-  if (DEMO) document.getElementById('openSettings').hidden = true;
   titleInput.addEventListener('input', () => {
     state.form.title = titleInput.value;
     markDirty();
     const opt = picker.querySelector(`option[value="${state.form.id}"]`);
-    if (opt) opt.textContent = titleInput.value || 'Tanpa judul';
+    if (opt) opt.textContent = `✓ ${titleInput.value || 'Tanpa judul'}`;
   });
   picker.addEventListener('change', async () => {
     const v = picker.value;
-    picker.value = state.form.id;
+    picker.value = '__ws';
+    if (v === state.form.id) return;
     if (state.dirty && !await confirmDialog('Tinggalkan perubahan?', 'Ada perubahan yang belum diterbitkan di form ini. Perubahan itu akan hilang.', { okLabel: 'Tinggalkan' })) return;
     if (v === '__new') newForm(); else openForm(v);
   });
