@@ -23,6 +23,9 @@ tests/               node --test (logic, stats, Apps Script mock, Worker di atas
 
 | Area | Isi |
 |---|---|
+| **Builder** | Tata letak ala Typeform: daftar pertanyaan (drag untuk urutan ulang) di kiri, kanvas WYSIWYG di tengah (klik teks untuk mengedit, ketik `@` untuk menyisipkan jawaban sebelumnya, tambah/hapus pilihan langsung), panel Pengaturan/Desain di kanan, modal "Tambah konten" berkategori, pratinjau desktop/ponsel |
+| **Tampilan responden** | Satu pertanyaan per layar dengan transisi geser vertikal, nomor + panah, kotak pilihan dengan badge huruf (A/B/C, Y/N), tombol OK ✓ + "tekan Enter ↵", dropdown yang bisa dicari, bintang rating, tanggal DD/MM/YYYY, telepon dengan kode negara, navigasi ↑↓ di pojok kanan bawah |
+| **Desain** | 8 tema siap pakai, 8 font, warna pertanyaan/jawaban/tombol/latar, gambar latar + kecerahan, sudut tajam/kecil/besar, rata kiri/tengah, gambar per pertanyaan (bawah teks / kiri / kanan) |
 | **Tipe pertanyaan** | Teks singkat, paragraf, email, telepon, angka, pilihan ganda (single/multi, acak urutan), dropdown, ya/tidak, rating bintang, skala opini (0–10 → NPS otomatis), tanggal, pernyataan |
 | **Logic** | Aturan "JIKA … MAKA lompat ke" per pertanyaan, kondisi AND/OR, 10 operator (sama dengan, mengandung, >, <, diisi, …), kondisi bisa pakai hidden field (mis. `utm_source`), default next, deteksi loop/target yang sudah dihapus |
 | **Personalisasi** | Answer piping `{{id_pertanyaan}}` dan `{{hidden:utm_source}}` di judul, deskripsi, halaman terima kasih, dan URL redirect |

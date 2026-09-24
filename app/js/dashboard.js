@@ -220,7 +220,9 @@ async function load(id) {
     const link = document.getElementById('sheetLink');
     link.hidden = !results.sheetUrl;
     link.href = results.sheetUrl || '#';
-    document.getElementById('editLink').href = `index.html?id=${encodeURIComponent(id)}`;
+    document.querySelectorAll('.tb-tabs [data-to]').forEach((a) => {
+      a.href = `index.html?id=${encodeURIComponent(id)}${a.dataset.to === 'content' ? '' : `#${a.dataset.to}`}`;
+    });
     history.replaceState(null, '', `?id=${encodeURIComponent(id)}`);
     render();
   } catch (err) {

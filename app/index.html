@@ -6,30 +6,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FormFlow Builder</title>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/form.css">
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand-mark">Form<span>Flow</span></div>
-    <select id="formPicker" aria-label="Pilih form"></select>
-    <button class="btn-ghost" id="newForm" type="button">+ Form baru</button>
-    <div class="spacer"></div>
-    <span class="backend-pill" id="backendPill"></span>
-    <button class="btn-ghost" id="openSettings" type="button">Pengaturan</button>
-    <a class="btn-ghost" id="openDashboard" href="dashboard.html">Dashboard</a>
-    <button class="btn-ghost" id="preview" type="button">Pratinjau</button>
-    <button class="btn" id="save" type="button">Simpan</button>
+<body class="builder">
+  <header class="tb">
+    <div class="tb-left">
+      <a class="tb-logo" href="index.html" aria-label="FormFlow">F</a>
+      <nav class="tb-crumb" aria-label="Form">
+        <select id="formPicker" class="tb-picker" aria-label="Pilih form"></select>
+        <span class="tb-sep">/</span>
+        <input id="formTitle" class="tb-title" aria-label="Judul form" maxlength="120">
+      </nav>
+    </div>
+    <nav class="tb-tabs" role="tablist" aria-label="Bagian">
+      <button role="tab" data-tab="content" class="active">Konten</button>
+      <button role="tab" data-tab="logic">Logika</button>
+      <button role="tab" data-tab="connect">Integrasi</button>
+      <button role="tab" data-tab="share">Bagikan</button>
+      <a role="tab" id="resultsTab" href="dashboard.html">Hasil</a>
+    </nav>
+    <div class="tb-right">
+      <span class="tb-status" id="saveStatus"></span>
+      <span class="backend-pill" id="backendPill"></span>
+      <button class="icon-btn" id="openSettings" type="button" title="Pengaturan backend" aria-label="Pengaturan backend"></button>
+      <button class="btn-ghost" id="preview" type="button"></button>
+      <button class="btn" id="save" type="button">Terbitkan</button>
+    </div>
   </header>
 
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="questions" class="active">Pertanyaan</button>
-    <button role="tab" data-tab="logic">Logika</button>
-    <button role="tab" data-tab="design">Tampilan</button>
-    <button role="tab" data-tab="tracking">Tracking &amp; Integrasi</button>
-    <button role="tab" data-tab="share">Bagikan</button>
-  </nav>
-
-  <main id="panel" class="panel"></main>
+  <main id="panel" class="bw"></main>
   <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="addDialog" class="modal modal-wide" aria-label="Tambah konten">
+    <div class="modal-head">
+      <h2>Tambah konten</h2>
+      <input id="addSearch" class="add-search" type="search" placeholder="Cari jenis pertanyaan…" aria-label="Cari jenis pertanyaan">
+      <button class="icon-btn" type="button" id="addClose" aria-label="Tutup"></button>
+    </div>
+    <div id="addGrid" class="add-grid"></div>
+  </dialog>
 
   <dialog id="settings" class="modal">
     <form method="dialog" id="settingsForm">

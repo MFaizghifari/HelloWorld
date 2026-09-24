@@ -59,6 +59,10 @@ test('validation per type', () => {
   assert.ok(validateAnswer({ type: 'opinion_scale', settings: { start: 0, steps: 11 } }, 11));
   assert.equal(validateAnswer({ type: 'opinion_scale', settings: { start: 0, steps: 11 } }, 10), null);
   assert.equal(validateAnswer({ type: 'rating', settings: { steps: 5 } }, 5), null);
+  assert.equal(validateAnswer({ type: 'date' }, '1995-02-28'), null);
+  assert.equal(validateAnswer({ type: 'date' }, '2024-02-29'), null); // leap year
+  assert.ok(validateAnswer({ type: 'date' }, '1995-02-31'), 'impossible date');
+  assert.ok(validateAnswer({ type: 'date' }, '0000-01-01'));
   const mc = { type: 'multiple_choice', options: [{ label: 'A' }, { label: 'B' }], settings: { multiple: true, maxSelections: 1 } };
   assert.ok(validateAnswer(mc, ['A', 'B']));
   assert.ok(validateAnswer(mc, ['C']));
