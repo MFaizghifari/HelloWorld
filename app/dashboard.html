@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FormFlow Dashboard</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand-mark" href="index.html" style="text-decoration:none;color:inherit">Form<span>Flow</span></a>
+    <select id="formPicker" aria-label="Pilih form"></select>
+    <select id="range" aria-label="Rentang waktu" style="width:auto">
+      <option value="7">7 hari terakhir</option>
+      <option value="30" selected>30 hari terakhir</option>
+      <option value="90">90 hari terakhir</option>
+      <option value="365">1 tahun</option>
+    </select>
+    <button class="btn-ghost" id="refresh" type="button">Muat ulang</button>
+    <div class="spacer"></div>
+    <a class="btn-ghost" id="sheetLink" target="_blank" rel="noopener" hidden>Buka Google Sheet</a>
+    <button class="btn-ghost" id="csv" type="button">Ekspor CSV</button>
+    <a class="btn" id="editLink" href="index.html">Edit form</a>
+  </header>
+  <main class="panel stack" id="dash"></main>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

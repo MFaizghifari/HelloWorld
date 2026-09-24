@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FormFlow Builder</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark">Form<span>Flow</span></div>
+    <select id="formPicker" aria-label="Pilih form"></select>
+    <button class="btn-ghost" id="newForm" type="button">+ Form baru</button>
+    <div class="spacer"></div>
+    <span class="backend-pill" id="backendPill"></span>
+    <button class="btn-ghost" id="openSettings" type="button">Pengaturan</button>
+    <a class="btn-ghost" id="openDashboard" href="dashboard.html">Dashboard</a>
+    <button class="btn-ghost" id="preview" type="button">Pratinjau</button>
+    <button class="btn" id="save" type="button">Simpan</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="questions" class="active">Pertanyaan</button>
+    <button role="tab" data-tab="logic">Logika</button>
+    <button role="tab" data-tab="design">Tampilan</button>
+    <button role="tab" data-tab="tracking">Tracking &amp; Integrasi</button>
+    <button role="tab" data-tab="share">Bagikan</button>
+  </nav>
+
+  <main id="panel" class="panel"></main>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="settings" class="modal">
+    <form method="dialog" id="settingsForm">
+      <h2>Pengaturan backend</h2>
+      <label class="field"><span>Penyimpanan data</span>
+        <select name="backend">
+          <option value="local">Browser ini saja (demo, tanpa server)</option>
+          <option value="sheets">Google Sheets (Apps Script)</option>
+        </select>
+      </label>
+      <label class="field"><span>URL Web App Apps Script</span>
+        <input name="sheetsUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+      </label>
+      <label class="field"><span>Admin key (sama dengan ADMIN_KEY di Script Properties)</span>
+        <input name="adminKey" type="password" autocomplete="off">
+      </label>
+      <p class="muted small">Pengaturan ini hanya tersimpan di browser Anda. Untuk produksi, isi juga <code>app/js/config.js</code> — atau biarkan: link share otomatis membawa URL backend.</p>
+      <div class="row end">
+        <button class="btn-ghost" value="cancel" type="submit">Batal</button>
+        <button class="btn" value="save" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/builder.js"></script>
+</body>
+</html>

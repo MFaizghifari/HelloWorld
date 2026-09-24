@@ -1,0 +1,11 @@
+{
+  "name": "formflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Typeform-style form builder with logic jumps, Meta Pixel + Conversions API, GA4/GTM, analytics dashboard, and a Google Sheets backend.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "start": "npx --yes http-server app -p 8080 -c-1"
+  }
+}
