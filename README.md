@@ -26,18 +26,21 @@ tests/               node --test (logic, stats, Apps Script mock, Worker di atas
 | **Builder** | Tata letak ala Typeform: daftar pertanyaan (drag untuk urutan ulang) di kiri, kanvas WYSIWYG di tengah (klik teks untuk mengedit, ketik `@` untuk menyisipkan jawaban sebelumnya, tambah/hapus pilihan langsung), panel Pengaturan/Desain di kanan, modal "Tambah konten" berkategori, pratinjau desktop/ponsel |
 | **Tampilan responden** | Satu pertanyaan per layar dengan transisi geser vertikal, nomor + panah, kotak pilihan dengan badge huruf (A/B/C, Y/N), tombol OK ✓ + "tekan Enter ↵", dropdown yang bisa dicari, bintang rating, tanggal DD/MM/YYYY, telepon dengan kode negara, navigasi ↑↓ di pojok kanan bawah |
 | **Desain** | 8 tema siap pakai, 8 font, warna pertanyaan/jawaban/tombol/latar, gambar latar + kecerahan, sudut tajam/kecil/besar, rata kiri/tengah, gambar per pertanyaan (bawah teks / kiri / kanan) |
-| **Tipe pertanyaan** | Teks singkat, paragraf, email, telepon, angka, pilihan ganda (single/multi, acak urutan), dropdown, ya/tidak, rating bintang, skala opini (0–10 → NPS otomatis), tanggal, pernyataan |
+| **Tipe pertanyaan** | Teks singkat, paragraf, email, telepon, angka, pilihan ganda (single/multi, acak urutan), dropdown, ya/tidak, rating bintang, skala opini (0–10 → NPS otomatis), tanggal, **unggah file**, pernyataan |
 | **Logic** | Aturan "JIKA … MAKA lompat ke" per pertanyaan, kondisi AND/OR, 10 operator (sama dengan, mengandung, >, <, diisi, …), kondisi bisa pakai hidden field (mis. `utm_source`), default next, deteksi loop/target yang sudah dihapus |
 | **Personalisasi** | Answer piping `{{id_pertanyaan}}` dan `{{hidden:utm_source}}` di judul, deskripsi, halaman terima kasih, dan URL redirect |
 | **Pengalaman responden** | Keyboard-first (Enter, huruf A/B/C), progress bar yang mengikuti jalur logic, navigasi ↑↓, mobile-friendly, validasi per tipe, redirect setelah submit (mis. ke WhatsApp) |
 | **Facebook Pixel** | PageView, `FormStart`, `FormStep` (opsional, per pertanyaan), event submit standar (`Lead`, `CompleteRegistration`, …) dengan `eventID` |
 | **Conversions API** | Dikirim dari Apps Script dengan `event_id` yang sama → dideduplikasi oleh Meta. Email & telepon di-hash SHA-256 (telepon `08…` dinormalisasi ke `628…`), plus `fbp`, `fbc`, user agent |
 | **Analytics lain** | GA4 (`form_start`, `form_step`, `generate_lead`), GTM dataLayer, UTM/fbclid/gclid otomatis tercatat |
-| **Dashboard** | Views, mulai, submission, completion rate, median waktu isi, tren harian, funnel drop-off per pertanyaan, sumber traffic, distribusi jawaban, NPS, tabel jawaban, ekspor CSV |
+| **Dashboard** | Views, mulai, submission, completion rate, median waktu isi, tren harian, funnel drop-off per pertanyaan, **konversi per perangkat dan per sumber** (segmen yang jelas lebih rendah ditandai), distribusi jawaban, NPS, file yang diunggah, tabel jawaban, ekspor CSV |
+| **Akun tim & peran** | Login email + kata sandi, 4 peran (Pemilik, Admin, Editor, Pembaca) yang ditegakkan di server, undangan & reset lewat link sekali pakai, log aktivitas |
+| **Upload file & gambar** | Pertanyaan "Unggah file" (gambar / PDF / dokumen, batas ukuran & jumlah), gambar form (pertanyaan, pembuka, logo, latar) bisa diunggah langsung dari builder |
+| **Uji A/B** | Varian B dari salinan form, pembagian pengunjung acak dan konsisten per browser, perbandingan konversi dengan uji statistik dan perkiraan sampel |
 | **Google Sheets** | Satu spreadsheet per form (tab `Responses` + `Events`), bisa otomatis dibagikan ke email tim, kolom tetap sinkron walau pertanyaan diganti judul/urutan |
 | **Integrasi** | Webhook (Make/Zapier/n8n/CRM), email notifikasi |
 | **Pemulihan jawaban** | Simpan jawaban yang belum selesai setelah kontak terisi, lanjutkan dari pertanyaan terakhir, event Pixel `FormContact` untuk retargeting, daftar "Belum selesai" dengan tombol WA |
-| **Keamanan** | Admin key untuk builder/dashboard, pencegahan formula injection di Sheets & CSV, honeypot anti-bot, ID Pixel/GA4/GTM divalidasi ketat sebelum dipasang, semua teks form dirender via `textContent` (tanpa `innerHTML`) |
+| **Keamanan** | Akun tim dengan peran (Cloudflare) atau admin key (Apps Script), pencegahan formula injection di Sheets & CSV, honeypot anti-bot, ID Pixel/GA4/GTM divalidasi ketat sebelum dipasang, jenis file dicek dari isinya, file hanya bisa dibuka anggota tim, semua teks form dirender via `textContent` (tanpa `innerHTML`) |
 
 ## Coba lokal (5 menit, tanpa Google)
 
@@ -54,6 +57,8 @@ echo 'ADMIN_KEY="dev"' > .dev.vars
 npm run db:migrate:local && npm run dev   # buka http://localhost:8787
 ```
 
+Saat pertama dibuka, builder meminta **admin key** (`dev` di contoh ini) untuk membuat akun Pemilik. Setelah itu semua orang masuk dengan email dan kata sandi. R2 (upload file) disimulasikan lokal oleh `wrangler dev`.
+
 Mode default **"Lokal (demo)"** menyimpan semua di browser Anda: cocok untuk mendesain form & melihat dashboard, tapi link-nya tidak bisa dibagikan ke orang lain.
 
 ## Deploy produksi: Cloudflare Workers + D1 (disarankan)
@@ -65,12 +70,15 @@ cd worker
 npm install
 npx wrangler login
 npx wrangler d1 create formflow --location apac   # salin database_id ke wrangler.toml
+npx wrangler r2 bucket create formflow-files      # penyimpanan file upload & gambar form
 npm run db:migrate                                # buat tabel di D1
-npx wrangler secret put ADMIN_KEY                 # kunci untuk builder & dashboard
+npx wrangler secret put ADMIN_KEY                 # kunci untuk membuat akun Pemilik (dan pemulihan akun)
 npm run deploy                                    # → https://formflow.<akun>.workers.dev
 ```
 
-Buka URL itu, klik **Pengaturan**, lalu isi admin key. Backend "Cloudflare D1" sudah terpilih otomatis. Custom domain (mis. `form.belajarlagi.id`) bisa ditambahkan di dashboard Cloudflare → Workers → Settings → Domains.
+Buka URL itu. Builder meminta admin key sekali untuk membuat **akun Pemilik**, lalu Anda bisa mengundang tim (lihat [Akun tim dan peran](#akun-tim-dan-peran)). Backend "Cloudflare D1" sudah terpilih otomatis. Custom domain (mis. `form.belajarlagi.id`) bisa ditambahkan di dashboard Cloudflare → Workers → Settings → Domains.
+
+**Deployment yang sudah berjalan:** jalankan `npm run db:migrate` (membuat tabel `users`, `auth_sessions`, `invites`, `audit_log`, `uploads`, `segments` dari `migrations/0003_team_files_segments.sql`), buat bucket R2 di atas, lalu `npm run deploy`. Setelah itu builder meminta login; admin key lama tetap berlaku untuk API/otomasi.
 
 **Secret opsional** (`npx wrangler secret put NAMA`):
 
@@ -79,6 +87,7 @@ Buka URL itu, klik **Pengaturan**, lalu isi admin key. Backend "Cloudflare D1" s
 | `FB_CAPI_TOKEN` | Access token Meta Conversions API. Di Worker, IP pengunjung ikut dikirim (`client_ip_address`) sehingga kualitas pencocokan lebih baik dibanding Apps Script |
 | `FB_TEST_EVENT_CODE` | Supaya event muncul di Events Manager → *Test events* |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` | Untuk salinan ke Google Sheets (lihat di bawah) |
+| `FILES_SECRET` | Opsional. Kunci tanda tangan link file sementara di dashboard. Jika kosong, diturunkan dari `ADMIN_KEY` |
 
 ### Salinan ke Google Sheets
 
@@ -139,6 +148,63 @@ Menurut benchmark Zuko, rata-rata **1 dari 3 orang yang mulai mengisi form berhe
 
 **Deployment yang sudah berjalan:** jalankan `npm run db:migrate` di folder `worker/` untuk membuat tabel `partials` (`migrations/0002_partials.sql`), lalu `npm run deploy`.
 
+## Akun tim dan peran
+
+Di backend Cloudflare, setiap anggota tim masuk dengan email dan kata sandinya sendiri. Admin key hanya dipakai sekali untuk membuat akun Pemilik, lalu untuk otomasi API dan pemulihan akun.
+
+| | Pemilik | Admin | Editor | Pembaca |
+|---|:-:|:-:|:-:|:-:|
+| Lihat hasil, jawaban, file, ekspor CSV | ✓ | ✓ | ✓ | ✓ |
+| Buat, edit, terbitkan, hapus form (termasuk Pixel, integrasi, uji A/B, unggah gambar) | ✓ | ✓ | ✓ | – |
+| Undang anggota, ubah peran, keluarkan anggota, lihat aktivitas | ✓ | ✓ | – | – |
+| Pindahkan kepemilikan | ✓ | – | – | – |
+
+- **Peran ditegakkan di server.** Tombol yang disembunyikan di builder hanya kenyamanan; Worker menolak aksi di luar peran dengan HTTP 403, juga untuk sesi yang sudah terbuka saat perannya diturunkan.
+- **Undangan dan reset kata sandi memakai link sekali pakai** (undangan 7 hari, reset 24 jam). FormFlow tidak mengirim email, jadi admin menyalin link atau mengirimnya lewat tombol WhatsApp. Pemilik yang lupa kata sandi membuat link reset sendiri dengan admin key dari halaman masuk.
+- **Kata sandi:** minimal 8 karakter tanpa aturan komposisi, sesuai [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html). Disimpan sebagai PBKDF2-HMAC-SHA256 100.000 iterasi dengan salt acak. OWASP menyarankan 600.000 iterasi ([Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)), tapi Workers membatasi iterasi PBKDF2 (workerd menolak dengan `iteration counts above … are not supported`, dan batas produksi yang umum dilaporkan adalah 100.000); jumlah iterasi ikut disimpan per hash sehingga bisa dinaikkan nanti (hash lama diperbarui saat login). Di workerd lokal, satu verifikasi ±43 ms CPU, jadi gunakan **Workers Paid** (batas CPU paket gratis 10 ms).
+- **Perlindungan login:** 5 kali salah → akun dikunci 15 menit; rate limit 10 percobaan/menit per IP dan per email; pesan error sama untuk email tak terdaftar dan kata sandi salah.
+- **Sesi:** token acak 32 byte, berlaku 30 hari, hanya hash SHA-256 yang disimpan di D1. Mengganti kata sandi atau reset mengakhiri sesi di perangkat lain; mengeluarkan anggota langsung mengakhiri semua sesinya.
+- **Log aktivitas** (menu Tim): siapa menerbitkan/menghapus form, memulai/mengakhiri uji A/B, mengundang, mengubah peran, atau mengeluarkan anggota. Disimpan 13 bulan.
+- **Apps Script** tidak punya akun tim: aksesnya tetap satu admin key, dan akses Sheet diatur lewat berbagi Google Drive. **Mode lokal/pratinjau** mensimulasikan tim di browser (ada pilihan "Lihat sebagai" untuk mencoba tiap peran).
+
+## Upload file
+
+Tipe pertanyaan **Unggah file**: pilih jenis (gambar, PDF, dokumen, atau semuanya), ukuran maksimal per file (2–25 MB), dan jumlah file (1–10). Responden bisa memilih atau menyeret file, melihat progres, dan menghapus sebelum mengirim. Gambar untuk form (pertanyaan, halaman pembuka, logo, latar) juga bisa diunggah langsung dari panel kanan builder.
+
+| | Cloudflare | Apps Script | Lokal (demo) |
+|---|---|---|---|
+| File responden | R2, privat | Folder Google Drive per form, dibagikan (lihat) ke email "Bagikan Sheet ke" | IndexedDB browser |
+| Gambar form | R2, publik di `/m/…` dengan cache 1 tahun | Drive, dibagikan "siapa saja yang punya link" | Disisipkan di form (diperkecil ke 1600 px) |
+| Di Google Sheet / CSV / webhook | `nama.pdf (https://…/f/…)` | `nama.pdf (link Drive)` | nama file |
+
+Keamanan dan privasi:
+- **Jenis file dicek dari isinya** (byte awal file), bukan dari nama atau header browser. HTML atau SVG yang diganti namanya menjadi `.png` ditolak (HTTP 415), sehingga file unggahan tidak bisa menjalankan skrip di domain Anda. File dikirim dengan `X-Content-Type-Options: nosniff` dan CSP `sandbox`.
+- **File hanya untuk tim.** Dashboard memakai link bertanda tangan yang berlaku 1 jam. Link permanen di Sheet, CSV, dan webhook hanya terbuka untuk anggota tim yang sedang masuk; pengunjung lain mendapat halaman "masuk dulu" (HTTP 401).
+- **File milik kunjungan itu sendiri.** Saat submit, server hanya menerima file yang diunggah oleh sesi yang sama untuk pertanyaan yang sama, dan memakai nama/jenis/ukuran versi server.
+- **Tidak ada file yatim.** File dari pengunjung yang tidak mengirim form dihapus otomatis setelah 24 jam (cron Worker; di Apps Script lewat `pruneOldEvents()`, pasang sebagai trigger harian). File tidak ikut disimpan di data "Belum selesai". Menghapus form menghapus semua filenya. Ini sejalan dengan prinsip pembatasan penyimpanan di UU PDP (UU 27/2022), karena foto KTM atau CV adalah data pribadi.
+- **Batas:** 60 upload/menit per IP, maksimal 3× jumlah file per pertanyaan per kunjungan.
+
+**Biaya R2:** gratis sampai 10 GB penyimpanan, 1 jt operasi tulis dan 10 jt operasi baca per bulan, dan tanpa biaya egress. Setelahnya US$0,015/GB-bulan ([R2 pricing](https://developers.cloudflare.com/r2/pricing/)). Contoh: jika 20% dari 30.000 isian/bulan mengunggah foto 2 MB, bertambah ±12 GB/bulan, atau sekitar US$0,2 per bulan untuk tiap 12 GB di atas kuota gratis.
+
+## Uji A/B
+
+Tab **Uji A/B** → **Buat varian B**: varian B dimulai sebagai salinan halaman pembuka, pertanyaan, halaman akhir, dan desain. Ubah satu hal di tab Konten (pilih **B** di atas kanvas). Pixel, integrasi, hidden field, dan link tetap satu untuk kedua varian, jadi hasil, Google Sheet, dan webhook tidak terpecah.
+
+- **Pembagian:** pengunjung baru diacak sesuai persentase (default 50/50) dan tetap di varian yang sama saat kembali (disimpan di browser). Link dengan `?ab=A` atau `?ab=B` menampilkan satu varian untuk dicek tanpa ikut dihitung.
+- **Yang dibandingkan:** konversi (terkirim ÷ pengunjung), mulai mengisi, dan selesai dari yang mulai, plus grafik konversi kumulatif per hari.
+- **Kapan ada pemenang:** uji memakai sampel yang ditetapkan di awal. Tiap varian butuh jumlah pengunjung untuk mendeteksi selisih 5 poin (α 5%, daya uji 80%), misalnya ±1.565 per varian bila konversi dasar 50% ([kalkulator Evan Miller](https://www.evanmiller.org/ab-testing/sample-size.html)). Pemenang baru disebut setelah kedua varian mencapainya **dan** uji berjalan minimal 7 hari (satu siklus mingguan), dengan uji dua proporsi p < 0,05. Sebelum itu dashboard menampilkan "peluang B lebih baik" dan perkiraan sisa waktu, karena menghentikan uji di momen pertama yang "signifikan" menaikkan salah positif ([Evan Miller, How Not To Run an A/B Test](https://www.evanmiller.org/how-not-to-run-an-ab-test.html)).
+- **Skala:** di 30.000 isian/bulan (±100.000 pengunjung/bulan pada konversi 30%), uji 50/50 mengumpulkan ±1.600 pengunjung per varian per hari, jadi batas 7 hari yang biasanya menentukan.
+- **Meta Ads:** selama uji berjalan, event Pixel dan Conversions API membawa parameter `ab_variant` (mis. `x_ab12cd:B`), sehingga konversi per varian bisa dilihat di Ads Manager lewat custom conversion.
+- **Mengakhiri:** pilih **Pakai B** (isi varian B menggantikan versi asli) atau **Pakai A**. Ringkasan uji disimpan di riwayat.
+
+## Konversi per perangkat dan per sumber
+
+Setiap kunjungan dicatat dengan perangkat dan sumbernya, lalu tab Hasil menampilkan konversi per segmen dengan garis rata-rata. Segmen yang konversinya jelas lebih rendah dari pengunjung lain (uji dua proporsi, p < 0,05, minimal 30 pengunjung) diberi tanda "di bawah rata-rata" dan disebut di kalimat pembuka Hasil.
+
+- **Perangkat:** ponsel, tablet, atau desktop dari user agent (iPad dengan iPadOS 13+ dikenali lewat layar sentuh).
+- **Sumber:** `utm_source` (ejaan umum disatukan, mis. `ig` → instagram), lalu `fbclid` (dilaporkan sebagai "meta", karena Meta menambahkannya untuk Facebook maupun Instagram), `gclid`, `ttclid`, lalu situs perujuk, lalu "(langsung)". `embed.js` meneruskan asal pengunjung halaman Anda (`_ref`), sehingga form yang ditanam tidak mencatat situs Anda sendiri sebagai sumber.
+- Di Cloudflare, segmen dihitung di tabel `segments` (seperti tabel agregat lain), jadi dashboard tetap tidak memindai data mentah.
+
 ## Embed di website
 
 Tab **Bagikan** menghasilkan 3 snippet. Disarankan memakai `embed.js`:
@@ -167,7 +233,7 @@ Kenapa tidak iframe polos saja? Safari (ITP) dan Chrome membatasi cookie pihak k
 | Baris dibaca D1 | dashboard membaca tabel agregat, kecil | 5 jt/hari | 25 miliar/bulan termasuk |
 | Penyimpanan D1 | ±1–2 KB per isian → ±50 MB/tahun | 5 GB | 5 GB termasuk, lalu berbayar |
 
-¹ Diukur, bukan ditebak: dengan form 8 pertanyaan, **±35 baris ditulis per pengunjung yang submit** (termasuk index) dan **±6,5 per pengunjung yang tidak submit**. 30.000 × 35 + 70.000 × 6,5 ≈ 1,5 jt.
+¹ Diukur, bukan ditebak: dengan form 8 pertanyaan, **±35 baris ditulis per pengunjung yang submit** (termasuk index) dan **±6,5 per pengunjung yang tidak submit**. 30.000 × 35 + 70.000 × 6,5 ≈ 1,5 jt. Rincian per perangkat/sumber/varian menambah 2–3 upsert per tahap (lihat, mulai, kirim), sehingga perkiraannya naik menjadi ±43 dan ±10 baris, atau ±2 jt baris/bulan. Angka tambahan ini dihitung dari jumlah query, belum diukur ulang di D1.
 
 **Rekomendasi: pakai Workers Paid (US$5/bulan).** Paket gratis memang muat untuk rata-rata harian, tetapi sisanya hanya ±2×. Hari kampanye dengan traffic 3× rata-rata (±150 rb baris ditulis) akan melewati batas harian 100 rb, dan saat itu penulisan ke D1 ditolak sampai kuota reset. Paket berbayar menghilangkan risiko itu dan masih menyisakan ±30× ruang.
 
@@ -196,19 +262,24 @@ npm test
 
 - `tests/logic.test.mjs`: logic jump, operator, validasi, piping, progress, deteksi loop
 - `tests/stats.test.mjs`: funnel, completion, NPS, sumber traffic, CSV aman formula
-- `tests/apps-script.test.mjs`: `Code.gs` asli dengan mock SpreadsheetApp/UrlFetchApp
+- `tests/apps-script.test.mjs`: `Code.gs` asli dengan mock SpreadsheetApp/UrlFetchApp/DriveApp (termasuk upload ke Drive dan kolom perangkat/sumber/varian)
+- `tests/team.test.mjs`: setup Pemilik, login (pesan error seragam, kunci 15 menit), peran ditegakkan server, undangan & reset sekali pakai, ganti kata sandi, log aktivitas
+- `tests/files.test.mjs`: deteksi jenis dari isi file, batas ukuran (termasuk body tanpa Content-Length), file harus milik sesi yang sama, link bertanda tangan / cookie tim, pembersihan 24 jam, gambar builder
+- `tests/ab-traffic.test.mjs`: ukuran sampel (1.565 per varian di 50% ± 5 poin, sama dengan kalkulator Evan Miller), vonis uji A/B, pembagian acak, klasifikasi perangkat & sumber, varian form
 - `tests/worker.test.mjs`: Worker asli di atas SQLite sungguhan (`node:sqlite`) dengan migrasi D1:
   - admin key, validasi, submit idempoten, payload CAPI (IP + hash SHA-256)
-  - **300 sesi simulasi** (bounce, berhenti di tengah, beacon abandon berulang, logic jump, multi-pilihan): statistik dari tabel agregat D1 **identik** dengan statistik yang dihitung ulang dari data mentah
+  - **300 sesi simulasi** (bounce, berhenti di tengah, beacon abandon berulang, logic jump, multi-pilihan, perangkat, sumber, dan uji A/B dengan pertanyaan yang hanya ada di varian B): statistik dari tabel agregat D1 **identik** dengan statistik yang dihitung ulang dari data mentah
   - ekspor berhalaman tanpa duplikat, sinkron Google Sheets (JWT asli, RAW, retry setelah 403, posisi kolom stabil)
   - jawaban belum selesai: hanya jika fitur aktif dan kontak valid, dibersihkan dari pertanyaan/parameter asing, diperbarui per sesi, dihapus saat submit (beacon terlambat tidak menghidupkannya lagi), dihapus setelah 30 hari
 
-Selain itu, alur builder → form → dashboard → ekspor CSV dan alur pemulihan (isi kontak → tutup tab → muncul di "Belum selesai" → kembali → lanjutkan → submit → hilang dari daftar) sudah diuji end-to-end dengan Playwright, baik di mode lokal maupun di runtime Cloudflare lokal (`wrangler dev` + D1).
+Selain itu, alur builder → form → dashboard → ekspor CSV dan alur pemulihan (isi kontak → tutup tab → muncul di "Belum selesai" → kembali → lanjutkan → submit → hilang dari daftar) sudah diuji end-to-end dengan Playwright, baik di mode lokal maupun di runtime Cloudflare lokal (`wrangler dev` + D1). Untuk fitur tim, upload, dan A/B, skenario end-to-end di `wrangler dev` (D1 + R2 lokal): buat akun Pemilik → undang Pembaca → responden di iPhone dari Instagram mengunggah KTM → file terbuka lewat link dashboard dan link permanen (Pemilik & Pembaca 200, anonim 401) → unggah logo → mulai uji A/B dan 8 pengunjung terbagi ke A/B → Pembaca hanya melihat Bagikan/Uji A/B/Hasil dan `deleteForm` ditolak 403.
 
 ## Keterbatasan saat ini
 
 - Belum diuji di akun Cloudflare, Google Cloud, dan Meta sungguhan. Yang sudah diuji: runtime workerd/D1 lokal, SQLite, dan mock HTTP. Sebelum menjalankan iklan: deploy, isi satu form, cek *Test events* di Meta, dan pastikan baris muncul di Google Sheet dalam 5 menit.
 - Email notifikasi hanya ada di backend Apps Script. Di Cloudflare, pakai webhook (Slack, Telegram, Make, n8n).
-- Belum ada upload file, pembayaran, atau multi-bahasa.
-- Admin key disimpan di `localStorage` browser admin. Jangan gunakan builder di komputer bersama.
+- Belum ada pembayaran atau multi-bahasa. Uji A/B hanya dua varian (A dan B).
+- FormFlow tidak mengirim email: undangan tim dan reset kata sandi berupa link yang dikirim sendiri.
+- Akun tim hanya ada di backend Cloudflare. Di Apps Script, admin key disimpan di `localStorage` browser admin; jangan gunakan builder di komputer bersama.
+- Upload ke Google Drive (Apps Script) baru diuji dengan mock, belum di akun Google sungguhan.
 - Di host selain Worker (mis. GitHub Pages), browser mencatat 404 untuk `formflow-config.js`. Ini tidak berbahaya.

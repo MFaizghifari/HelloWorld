@@ -6,12 +6,39 @@ import { el } from './dom.js';
 import { icon } from './icons.js';
 import {
   END, firstQuestionId, nextQuestionId, validateAnswer, progress, uid, interpolate, partialsEnabled, contactFrom, DEFAULT_CONSENT_TEXT,
+  experimentRunning, variantForm, fileProblem,
 } from './logic.js';
 import { applyTheme, welcomeScreen, questionScreen, thankYouScreen, brandLogo } from './renderer.js';
 import { createTracker, newEventId, fbIdentifiers } from './tracking.js';
+import { assignVariant } from './ab.js';
+import { deviceOf, sourceOf } from './traffic.js';
 
 const AUTO_HIDDEN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
 const RESUME_DAYS = 7;
+
+/**
+ * The A/B variant for this visitor: kept per browser, so a returning visitor
+ * sees the same version. ?ab=A or ?ab=B shows one variant for checking, and
+ * such visits are left out of the test.
+ */
+function pickVariant(form, params) {
+  const forced = params.get('ab');
+  if (forced === 'A' || forced === 'B') return { variant: forced, counted: false };
+  const key = `ff_ab_${form.id}_${form.experiment.id}`;
+  let v = null;
+  try { v = localStorage.getItem(key); } catch { /* storage unavailable: a fresh draw per visit */ }
+  if (v !== 'A' && v !== 'B') {
+    v = assignVariant(form.experiment.split ?? 50);
+    try { localStorage.setItem(key, v); } catch { /* ignore */ }
+  }
+  return { variant: v, counted: true };
+}
+
+/** Where the visitor came from; the builder, embed.js (_ref) or this site itself are not a source. */
+function referrerOf(params) {
+  if (params.has('_ref')) return params.get('_ref');
+  try { return new URL(document.referrer).origin === location.origin ? '' : document.referrer; } catch { return ''; }
+}
 
 /**
  * @param {HTMLElement} host   element the form fills
@@ -24,6 +51,15 @@ const RESUME_DAYS = 7;
  *   onRestart   shows a "restart" action on the ending screen (preview only)
  */
 export function mountForm(host, form, { backend = null, preview = false, embedded = false, params = new URLSearchParams(), onRestart } = {}) {
+  const test = !preview && experimentRunning(form) ? pickVariant(form, params) : null;
+  const tag = test?.counted ? `${form.experiment.id}:${test.variant}` : '';
+  if (test?.variant === 'B') form = variantForm(form, 'B');
+  // Sent with every event and the submission, for the per-device / per-source / A-B breakdowns.
+  const dims = preview ? {} : {
+    device: deviceOf(navigator.userAgent, { touchPoints: navigator.maxTouchPoints }),
+    source: sourceOf(Object.fromEntries(params), referrerOf(params)),
+    variant: tag,
+  };
   const root = el('div', { class: `ff ff-runner${embedded ? ' ff-embedded' : ''}` });
   const bar = el('div', { class: 'ff-progress-bar' });
   const stage = el('main', { class: 'ff-stage', 'aria-live': 'polite' });
@@ -95,7 +131,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     state.contactCaptured = true;
     state.tracker?.contact();
     if (savePartials) {
-      backend.logEvent(form.id, { type: 'partial', sessionId: state.sessionId, path: [...state.history], answers: answersOnPath(), hidden: state.hidden });
+      backend.logEvent(form.id, { type: 'partial', sessionId: state.sessionId, path: [...state.history], answers: answersOnPath(), hidden: state.hidden, ...dims });
     }
   }
 
@@ -137,11 +173,22 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     const screen = questionScreen(form, q, {
       mode: 'live', answers: state.answers, hidden: state.hidden, value, isLast, consent: consentText,
       onSubmit: (val, api) => commit(q, val, api),
+      upload: (file, onProgress) => uploadFile(q, file, onProgress),
+      fileLink: (f) => backend?.fileLink?.(f) || '',
     });
     // Honeypot for bots: hidden from humans and assistive tech.
     if (isLast) screen.el.querySelector('.ff-content').append(el('input', { class: 'ff-hp', name: 'website', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' }));
     show(screen, dir);
     state.tracker?.step(q, state.history.length);
+  }
+
+  /** Respondent file upload; in preview nothing leaves the browser. */
+  async function uploadFile(q, file, onProgress) {
+    if (!preview) return backend.uploadFile(form.id, { question: q, sessionId: state.sessionId, file, onProgress });
+    const problem = fileProblem(q, file);
+    if (problem) throw new Error(problem);
+    for (const p of [0.4, 1]) { onProgress?.(p); await new Promise((r) => setTimeout(r, 150)); }
+    return { ref: `preview:${uid('f')}`, name: file.name, type: file.type, size: file.size };
   }
 
   function commit(q, val, api) {
@@ -156,7 +203,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     if (!state.started) {
       state.started = true;
       state.tracker?.start();
-      if (!preview) backend.logEvent(form.id, { type: 'start', sessionId: state.sessionId, path: [q.id] });
+      if (!preview) backend.logEvent(form.id, { type: 'start', sessionId: state.sessionId, path: [q.id], ...dims });
     }
     state.history.push(q.id);
     onContactMaybe();
@@ -201,6 +248,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
         referrer: document.referrer.slice(0, 500),
         userAgent: navigator.userAgent,
         ...fbIdentifiers(),
+        ...dims,
       },
     };
     try {
@@ -239,7 +287,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     if (path.length <= state.abandonSentLen) return;
     state.abandonSentLen = path.length;
     const extra = savePartials && state.contactCaptured ? { answers: answersOnPath(), hidden: state.hidden } : {};
-    backend.logEvent(form.id, { type: 'abandon', sessionId: state.sessionId, path, ...extra }, { beacon: true });
+    backend.logEvent(form.id, { type: 'abandon', sessionId: state.sessionId, path, ...extra, ...dims }, { beacon: true });
   }
   const onVisibility = () => { if (document.visibilityState === 'hidden') sendAbandon(); };
 
@@ -254,7 +302,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     const restart = () => {
       clearProgress();
       state.sessionId = uid('s'); // a fresh visit, counted as a new session
-      if (!preview) backend.logEvent(form.id, { type: 'view', sessionId: state.sessionId, path: [] });
+      if (!preview) backend.logEvent(form.id, { type: 'view', sessionId: state.sessionId, path: [], ...dims });
       startFresh();
     };
     const name = contactFrom(form, saved.answers || {})?.name;
@@ -292,9 +340,9 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
   }
   if (form.theme?.hideBranding) brand.hidden = true;
   if (!preview) {
-    state.tracker = createTracker(form.tracking, { formId: form.id, formTitle: form.title });
+    state.tracker = createTracker(form.tracking, { formId: form.id, formTitle: form.title, variant: tag });
     state.tracker.pageView();
-    backend.logEvent(form.id, { type: 'view', sessionId: state.sessionId, path: [] });
+    backend.logEvent(form.id, { type: 'view', sessionId: state.sessionId, path: [], ...dims });
   }
   document.addEventListener('keydown', onKey);
   prevBtn.addEventListener('click', back);

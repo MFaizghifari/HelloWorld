@@ -27,6 +27,11 @@
     var host = new URLSearchParams(location.search);
     FORWARD.forEach(function (k) { if (host.get(k) && !url.searchParams.get(k)) url.searchParams.set(k, host.get(k)); });
     url.searchParams.set('embed', '1');
+    // Where visitors of this page came from (origin only), for the form's per-source report.
+    var ref = '';
+    try { ref = document.referrer ? new URL(document.referrer).origin : ''; } catch (e) { /* ignore */ }
+    if (ref === location.origin) ref = '';
+    url.searchParams.set('_ref', ref);
     if (typeof window.fbq === 'function') url.searchParams.set('hostpixel', '1');
     if (cookie('_fbp')) url.searchParams.set('_fbp', cookie('_fbp'));
     if (cookie('_fbc')) url.searchParams.set('_fbc', cookie('_fbc'));

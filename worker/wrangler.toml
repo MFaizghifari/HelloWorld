@@ -30,5 +30,23 @@ name = "SUBMIT_LIMITER"
 namespace_id = "1001"
 simple = { limit = 300, period = 60 }
 
+# Login, account setup and invitation links: per IP and per email.
+[[ratelimits]]
+name = "AUTH_LIMITER"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
+
+# File uploads by respondents, per IP.
+[[ratelimits]]
+name = "UPLOAD_LIMITER"
+namespace_id = "1003"
+simple = { limit = 60, period = 60 }
+
+# Uploaded files (respondent answers, private) and form images (public).
+# Create once: npx wrangler r2 bucket create formflow-files
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "formflow-files"
+
 [observability]
 enabled = true

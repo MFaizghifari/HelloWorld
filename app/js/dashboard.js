@@ -17,7 +17,11 @@ function show(id) {
 
 async function init() {
   let forms = [];
-  try { forms = await backend.listForms(); } catch (err) { host.replaceChildren(el('p', { class: 'empty-state', text: err.message })); }
+  try { forms = await backend.listForms(); } catch (err) {
+    host.replaceChildren(el('div', { class: 'empty-state' }, el('p', { text: err.message }),
+      err.status === 401 ? el('a', { class: 'btn', href: 'index.html', text: 'Masuk di builder' }) : null));
+    return;
+  }
   const id = new URLSearchParams(location.search).get('id') || forms[0]?.id;
   picker.replaceChildren(...forms.map((f) => el('option', { value: f.id, selected: f.id === id, text: f.title || f.id })));
   if (!id) { host.replaceChildren(el('div', { class: 'empty-state', text: 'Belum ada form. Buat dulu di builder.' })); return; }

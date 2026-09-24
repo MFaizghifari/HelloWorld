@@ -24,6 +24,7 @@
       <button role="tab" data-tab="logic">Logika</button>
       <button role="tab" data-tab="connect">Integrasi</button>
       <button role="tab" data-tab="share">Bagikan</button>
+      <button role="tab" data-tab="ab">Uji A/B</button>
       <button role="tab" data-tab="results">Hasil</button>
     </nav>
     <div class="tb-right">
@@ -32,6 +33,7 @@
       <button class="tb-backend" id="openSettings" type="button" title="Tempat data disimpan"></button>
       <button class="btn-ghost" id="preview" type="button"></button>
       <button class="btn" id="save" type="button">Terbitkan</button>
+      <button class="tb-account" id="account" type="button" aria-label="Akun dan tim" aria-haspopup="menu" hidden></button>
     </div>
   </header>
 
@@ -67,10 +69,10 @@
       <label class="field" data-for="sheets"><span>URL Web App Apps Script</span>
         <input name="sheetsUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec">
       </label>
-      <label class="field"><span>Admin key (ADMIN_KEY di Worker secret / Script Properties)</span>
+      <label class="field" data-for="sheets"><span>Admin key (ADMIN_KEY di Script Properties)</span>
         <input name="adminKey" type="password" autocomplete="off">
       </label>
-      <p class="muted small">Pengaturan ini hanya tersimpan di browser Anda. Jika builder di-host oleh Worker, backend cloud sudah terpilih otomatis — cukup isi admin key.</p>
+      <p class="muted small">Pengaturan ini hanya tersimpan di browser Anda. Jika builder di-host oleh Worker, backend Cloudflare sudah terpilih otomatis dan Anda masuk dengan akun tim.</p>
       <div class="row end">
         <button class="btn-ghost" value="cancel" type="submit">Batal</button>
         <button class="btn" value="save" type="submit">Simpan</button>
@@ -92,6 +94,10 @@
     </div>
     <div class="preview-stage"><div class="preview-frame" id="previewFrame"></div></div>
   </dialog>
+
+  <dialog id="teamDialog" class="modal modal-wide team-dialog" aria-label="Tim"></dialog>
+  <dialog id="accountDialog" class="modal" aria-label="Akun Anda"></dialog>
+  <div id="auth" class="auth" hidden></div>
 
   <dialog id="confirmDialog" class="modal confirm-dialog">
     <form method="dialog">

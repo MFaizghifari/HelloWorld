@@ -2,44 +2,11 @@
 // like Cloudflare D1, with the real migration applied.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { generateKeyPairSync, createHash } from 'node:crypto';
 import worker, { syncSheets, sheetColumns, purgeOldPartials } from '../worker/src/index.js';
 import { computeStats } from '../app/js/stats.js';
-import { nextQuestionId, END } from '../app/js/logic.js';
-
-// ─── Minimal D1 shim ────────────────────────────────────────────────────────
-function d1() {
-  const db = new DatabaseSync(':memory:');
-  const dir = new URL('../worker/migrations/', import.meta.url);
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) db.exec(readFileSync(new URL(f, dir), 'utf8'));
-  const stmt = (sql, params = []) => ({
-    bind: (...p) => stmt(sql, p),
-    first: async () => db.prepare(sql).get(...params) ?? null,
-    all: async () => ({ results: db.prepare(sql).all(...params) }),
-    run: async () => { const r = db.prepare(sql).run(...params); return { meta: { changes: Number(r.changes) } }; },
-    _exec: () => (/^\s*(SELECT|WITH)/i.test(sql) ? { results: db.prepare(sql).all(...params) } : { results: [], meta: { changes: Number(db.prepare(sql).run(...params).changes) } }),
-  });
-  return {
-    raw: db,
-    prepare: (sql) => stmt(sql),
-    async batch(stmts) {
-      db.exec('BEGIN');
-      try { const out = stmts.map((s) => s._exec()); db.exec('COMMIT'); return out; } catch (e) { db.exec('ROLLBACK'); throw e; }
-    },
-  };
-}
-
-function makeEnv(extra = {}) {
-  return { DB: d1(), ADMIN_KEY: 'secret-key', TZ_OFFSET_MINUTES: '0', ...extra };
-}
-
-async function api(env, body, { ip = '203.0.113.9', waits = [] } = {}) {
-  const req = new Request('https://formflow.test/api', { method: 'POST', body: JSON.stringify(body), headers: { 'CF-Connecting-IP': ip } });
-  const res = await worker.fetch(req, env, { waitUntil: (p) => waits.push(p) });
-  return { status: res.status, ...(await res.json()) };
-}
+import { nextQuestionId, END, variantForm } from '../app/js/logic.js';
+import { makeEnv, api } from './support.mjs';
 
 const form = {
   id: 'f_test01',
@@ -107,9 +74,17 @@ test('admin gate, public form hides integrations, validation, idempotent submit,
   }
 });
 
-test('D1 aggregates match stats computed from raw data (300 simulated sessions)', async () => {
+test('D1 aggregates match stats computed from raw data (300 simulated sessions, devices, sources, A/B)', async () => {
   const env = makeEnv();
-  await api(env, { action: 'saveForm', key: 'secret-key', form: { ...form, integrations: {} } });
+  // Variant B asks one extra question after the name; half the visitors see it.
+  const abForm = {
+    ...structuredClone(form), integrations: {},
+    experiment: { id: 'x_test01', status: 'running', split: 50 },
+  };
+  const bQuestions = structuredClone(form.questions);
+  bQuestions.splice(1, 0, { id: 'q_extra', type: 'short_text', title: 'Kota' });
+  abForm.variants = { B: { questions: bQuestions } };
+  await api(env, { action: 'saveForm', key: 'secret-key', form: abForm });
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed / 2 ** 31; };
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -120,8 +95,11 @@ test('D1 aggregates match stats computed from raw data (300 simulated sessions)'
   for (let i = 0; i < 300; i++) {
     const sessionId = `s_sim${i}`;
     const hidden = rnd() < 0.5 ? { utm_source: pick(['facebook', 'instagram', 'tiktok']) } : {};
-    await api(env, { action: 'event', formId: form.id, type: 'view', sessionId });
-    rawEvents.push({ ts, sessionId, type: 'view', path: [] });
+    const v = rnd() < 0.5 ? 'B' : 'A';
+    const dims = { device: pick(['mobile', 'mobile', 'desktop', 'tablet']), source: hidden.utm_source || pick(['(langsung)', 'google']), variant: `x_test01:${v}` };
+    const shown = variantForm(abForm, v);
+    await api(env, { action: 'event', formId: form.id, type: 'view', sessionId, ...dims });
+    rawEvents.push({ ts, sessionId, type: 'view', path: [], ...dims });
     if (rnd() < 0.2) continue; // bounced on the welcome screen
 
     const answers = {};
@@ -138,38 +116,49 @@ test('D1 aggregates match stats computed from raw data (300 simulated sessions)'
       if (q === 'q_role') answers[q] = rnd() < 0.3 ? ['Mahasiswa', 'Karyawan'] : [pick(['Mahasiswa', 'Karyawan', 'Pemilik bisnis'])];
       if (q === 'q_size') answers[q] = Math.floor(rnd() * 50);
       if (q === 'q_nps') answers[q] = Math.floor(rnd() * 11);
+      if (q === 'q_extra') answers[q] = pick(['Bandung', 'Medan']);
       if (path.length === 1) {
-        await api(env, { action: 'event', formId: form.id, type: 'start', sessionId, path: [...path] });
-        rawEvents.push({ ts, sessionId, type: 'start', path: [...path] });
+        await api(env, { action: 'event', formId: form.id, type: 'start', sessionId, path: [...path], ...dims });
+        rawEvents.push({ ts, sessionId, type: 'start', path: [...path], ...dims });
       }
       // Mobile tab switches send extra abandon beacons mid-way; they must not double count.
       if (rnd() < 0.3) {
-        await api(env, { action: 'event', formId: form.id, type: 'abandon', sessionId, path: [...path] });
-        rawEvents.push({ ts, sessionId, type: 'abandon', path: [...path] });
+        await api(env, { action: 'event', formId: form.id, type: 'abandon', sessionId, path: [...path], ...dims });
+        rawEvents.push({ ts, sessionId, type: 'abandon', path: [...path], ...dims });
       }
-      q = nextQuestionId(form, q, answers);
+      q = nextQuestionId(shown, q, answers);
       if (q === END) completed = true;
     }
     if (completed) {
-      const meta = { sessionId, path, durationSec: 10 + Math.floor(rnd() * 100) };
+      const meta = { sessionId, path, durationSec: 10 + Math.floor(rnd() * 100), ...dims };
       const r = await api(env, { action: 'submit', formId: form.id, answers, hidden, meta });
       assert.equal(r.ok, true, r.error);
-      rawEvents.push({ ts, sessionId, type: 'complete', path });
+      rawEvents.push({ ts, sessionId, type: 'complete', path, ...dims });
       rawResponses.push({ submittedAt: ts, answers, hidden, meta });
     } else {
-      await api(env, { action: 'event', formId: form.id, type: 'abandon', sessionId, path });
-      rawEvents.push({ ts, sessionId, type: 'abandon', path });
+      await api(env, { action: 'event', formId: form.id, type: 'abandon', sessionId, path, ...dims });
+      rawEvents.push({ ts, sessionId, type: 'abandon', path, ...dims });
     }
   }
 
   const res = await api(env, { action: 'getResults', key: 'secret-key', formId: form.id, days: 7 });
   assert.equal(res.ok, true, res.error);
   const cloud = res.stats;
-  const local = computeStats(form, rawResponses, rawEvents, { days: 7 });
+  const local = computeStats(abForm, rawResponses, rawEvents, { days: 7 });
   for (const k of ['views', 'starts', 'completions', 'medianDurationSec']) assert.equal(cloud[k], local[k], k);
   assert.deepEqual(cloud.funnel, local.funnel);
-  assert.deepEqual(cloud.sources, local.sources);
+  assert.deepEqual(cloud.segments, local.segments);
+  assert.deepEqual(Object.keys(cloud.segments.variant).sort(), ['x_test01:A', 'x_test01:B']);
+  assert.equal(Object.values(cloud.segments.device).reduce((a, d) => a + d.views, 0), cloud.views, 'every view has a device');
   assert.deepEqual(cloud.daily, local.daily);
+  const extra = cloud.perQuestion.find((q) => q.id === 'q_extra');
+  assert.ok(extra && extra.answered > 0, 'question that only variant B has is in the results');
+
+  // The whole run of the experiment, per day and variant.
+  const exp = await api(env, { action: 'getExperiment', key: 'secret-key', formId: form.id, experimentId: 'x_test01' });
+  const sum = (v, k) => exp.days.filter((d) => d.variant === v).reduce((a, d) => a + d[k], 0);
+  assert.equal(sum('A', 'views') + sum('B', 'views'), cloud.views);
+  assert.equal(sum('B', 'completions'), cloud.segments.variant['x_test01:B'].completions);
   for (const [i, q] of local.perQuestion.entries()) {
     const c = cloud.perQuestion[i];
     assert.equal(c.answered, q.answered, q.id);
@@ -294,4 +283,26 @@ test('partial responses: opt-in, needs valid contact, sanitised, replaced by sub
   env.DB.raw.prepare("UPDATE partials SET updated_at = '2020-01-01T00:00:00.000Z'").run();
   assert.equal(await purgeOldPartials(env), 1);
   assert.equal(count(), 0);
+});
+
+test('A/B: answers are checked against the variant the visitor saw; forged variants are ignored', async () => {
+  const env = makeEnv();
+  const f = {
+    ...structuredClone(form), integrations: {},
+    variants: { B: { questions: [...structuredClone(form.questions), { id: 'q_only_b', type: 'short_text', title: 'Kota' }] } },
+    experiment: { id: 'x_real01', status: 'running', split: 50 },
+  };
+  await api(env, { action: 'saveForm', key: 'secret-key', form: f });
+  await api(env, { action: 'event', formId: f.id, type: 'view', sessionId: 's_forge', variant: 'x_fake01:B', device: 'phone??', source: 'IG/story' },);
+  const row = env.DB.raw.prepare("SELECT device, source, variant FROM sessions WHERE id = 's_forge'").get();
+  assert.deepEqual({ ...row }, { device: 'desktop', source: 'ig-story', variant: '' }, 'unknown device falls back to the User-Agent; forged variant dropped');
+
+  await api(env, { action: 'submit', formId: f.id, answers: { q_name: 'A', q_only_b: 'Medan' }, meta: { sessionId: 's_va', variant: 'x_real01:A' } });
+  await api(env, { action: 'submit', formId: f.id, answers: { q_name: 'B', q_only_b: 'Medan' }, meta: { sessionId: 's_vb', variant: 'x_real01:B' } });
+  const rows = env.DB.raw.prepare('SELECT answers, meta FROM responses ORDER BY submitted_at, id').all().map((r) => ({ a: JSON.parse(r.answers), m: JSON.parse(r.meta) }));
+  const a = rows.find((r) => r.a.q_name === 'A');
+  const b = rows.find((r) => r.a.q_name === 'B');
+  assert.equal(a.a.q_only_b, undefined, 'variant A never showed that question');
+  assert.equal(b.a.q_only_b, 'Medan');
+  assert.equal(b.m.variant, 'x_real01:B');
 });

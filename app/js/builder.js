@@ -6,6 +6,7 @@ import { el } from './dom.js';
 import { icon } from './icons.js';
 import {
   END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle, nextQuestionId, partialsEnabled, DEFAULT_CONSENT_TEXT, PARTIAL_RETENTION_DAYS,
+  VARIANT_KEYS, variantForm, allQuestions, FILE_KINDS, fileRules,
 } from './logic.js';
 import {
   applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen, brandLogo,
@@ -14,6 +15,9 @@ import { ID_PATTERNS, FB_STANDARD_EVENTS } from './tracking.js';
 import { mountForm } from './runner.js';
 import { mountResults } from './results.js';
 import { TYPE_META, typeTile } from './types.js';
+import { can, allowedTabs, ROLES } from './roles.js';
+import { createTeamUI } from './team.js';
+import { renderAbTab, endExperiment } from './abtest.js';
 
 const panel = document.getElementById('panel');
 const picker = document.getElementById('formPicker');
@@ -26,7 +30,9 @@ const DEMO = !!serverConfig().demo;
 const state = {
   form: null,
   forms: [],
-  tab: 'content', // content | logic | connect | share | results
+  user: null, // signed-in (Cloudflare) or simulated (local) member; null = admin key (Apps Script)
+  variant: 'A', // which A/B variant the Konten and Logika tabs edit
+  tab: 'content', // content | logic | connect | share | ab | results
   selected: null, // 'welcome' | 'ending' | question id
   side: 'settings', // settings | design
   device: 'desktop', // desktop | mobile
@@ -34,6 +40,38 @@ const state = {
   sheetUrl: '',
   shareMode: 'inline',
 };
+
+// ─── A/B variants ───────────────────────────────────────────────────────────
+// doc() is what the Konten and Logika tabs edit: the form itself, or, while
+// variant B is selected, a view whose screens (welcome, questions, ending,
+// theme) are B's and everything else is the form's. Writes land where reads
+// come from, so every editor below works unchanged on either variant.
+const SCREEN_KEYS = new Set(VARIANT_KEYS);
+let docView = null;
+function doc() {
+  const f = state.form;
+  const b = state.variant === 'B' ? f.variants?.B : null;
+  if (!b) return f;
+  if (docView?.form !== f || docView.b !== b) {
+    docView = {
+      form: f, b,
+      proxy: new Proxy(f, {
+        get: (t, k) => (SCREEN_KEYS.has(k) ? b[k] : t[k]),
+        set: (t, k, v) => { if (SCREEN_KEYS.has(k)) b[k] = v; else t[k] = v; return true; },
+      }),
+    };
+  }
+  return docView.proxy;
+}
+
+/** B always carries its own copy of every screen, so edits to B never touch A. */
+function normalizeVariants(f) {
+  const b = f.variants?.B;
+  if (!b) { if (state.variant === 'B') state.variant = 'A'; return; }
+  for (const k of VARIANT_KEYS) if (b[k] === undefined) b[k] = structuredClone(f[k] ?? (k === 'questions' ? [] : {}));
+}
+
+const canEdit = () => can(state.user?.role || 'owner', 'forms.edit');
 
 // ─── Question type catalogue (colours follow Typeform's category grouping) ──
 const CATEGORIES = [
@@ -43,6 +81,7 @@ const TYPE_HELP = {
   email: 'Validasi format email', phone: 'Dengan kode negara', short_text: 'Jawaban satu baris', long_text: 'Jawaban panjang',
   statement: 'Teks informasi tanpa input', multiple_choice: 'Satu atau beberapa pilihan', dropdown: 'Daftar panjang yang bisa dicari',
   yes_no: 'Dua pilihan cepat', rating: 'Bintang 3–10', opinion_scale: 'Skala angka, NPS', number: 'Angka dengan batas', date: 'Hari / bulan / tahun',
+  file_upload: 'Gambar, PDF, dokumen',
 };
 
 // Longer help and a realistic sample for the "Tambah konten" preview pane.
@@ -59,6 +98,7 @@ const TYPE_DESC = {
   opinion_scale: 'Skala angka. Skala 0 sampai 10 otomatis dihitung NPS di Hasil.',
   number: 'Angka dengan batas minimum dan maksimum.',
   date: 'Tanggal dengan format HH / BB / TTTT.',
+  file_upload: 'Responden mengunggah file: foto KTM, CV, bukti transfer. Hanya anggota tim yang bisa membukanya.',
 };
 const SAMPLE = {
   email: 'Apa email Anda?', phone: 'Nomor WhatsApp yang bisa dihubungi?', short_text: 'Siapa nama Anda?',
@@ -66,6 +106,7 @@ const SAMPLE = {
   multiple_choice: 'Apa status Anda saat ini?', dropdown: 'Di kota mana Anda tinggal?', yes_no: 'Bersedia dihubungi lewat WhatsApp?',
   rating: 'Seberapa puas dengan kelas sebelumnya?', opinion_scale: 'Seberapa mungkin Anda merekomendasikan kami?',
   number: 'Berapa jumlah karyawan di bisnis Anda?', date: 'Kapan tanggal lahir Anda?',
+  file_upload: 'Unggah foto KTM Anda',
 };
 
 function sampleQuestion(type) {
@@ -118,6 +159,7 @@ function newQuestion(type) {
   if (type === 'rating') q.settings = { steps: 5 };
   if (type === 'opinion_scale') q.settings = { start: 0, steps: 11 };
   if (type === 'statement') q.settings = { buttonText: 'Lanjut' };
+  if (type === 'file_upload') q.settings = { fileKind: 'image', maxSizeMb: 10, maxFiles: 1 };
   return q;
 }
 
@@ -229,20 +271,20 @@ function shareUrl() {
 
 let cloudInfo = null; // { serviceAccountEmail, capi } from the Worker
 async function loadCloudInfo() {
-  if (backend.name !== 'cloud' || cloudInfo || !getAdminKey()) return;
+  if (backend.name !== 'cloud' || cloudInfo || !state.user) return;
   try { cloudInfo = await backend.info(); if (state.tab === 'connect') render(); } catch { /* shown elsewhere */ }
 }
 
 // ─── Content tab: sidebar ───────────────────────────────────────────────────
 function ensureSelection() {
-  const f = state.form;
+  const f = doc();
   const valid = state.selected === 'welcome' || state.selected === 'ending' || f.questions.some((q) => q.id === state.selected);
   if (!valid) state.selected = f.questions[0]?.id || 'welcome';
 }
 
 let dragId = null;
 function sidebarItem(q, i) {
-  const f = state.form;
+  const f = doc();
   const item = el('li', {
     class: `bw-item${state.selected === q.id ? ' active' : ''}`, draggable: 'true', tabindex: 0, 'data-id': q.id,
     'aria-label': `Pertanyaan ${i + 1}: ${questionTitle(q)}. Alt + panah untuk memindahkan.`,
@@ -292,7 +334,7 @@ function sidebarItem(q, i) {
 }
 
 function renderSidebar() {
-  const f = state.form;
+  const f = doc();
   const w = f.welcome || {};
   const special = (id, iconName, label, sub, off) => el('li', {
     class: `bw-item bw-special${state.selected === id ? ' active' : ''}${off ? ' off' : ''}`, tabindex: 0,
@@ -301,6 +343,7 @@ function renderSidebar() {
   el('span', { class: 'bw-item-title' }, el('span', { text: label }), sub ? el('small', { text: sub }) : null));
 
   return el('aside', { class: 'bw-left' },
+    variantNotice(),
     el('button', { class: 'btn-soft add-btn', type: 'button', onclick: openAddDialog }, icon('plus', { size: 16 }), 'Tambah konten'),
     el('div', { class: 'bw-scroll' },
       el('ul', { class: 'bw-list' }, special('welcome', 'welcome', 'Halaman pembuka', w.enabled === false ? 'nonaktif' : plainTitle(w.title || f.title), w.enabled === false)),
@@ -312,7 +355,7 @@ function renderSidebar() {
 }
 
 function refreshSidebarText() {
-  const f = state.form;
+  const f = doc();
   f.questions.forEach((q) => {
     const n = panel.querySelector(`.bw-item[data-id="${q.id}"] .bw-item-title`);
     if (n) n.textContent = questionTitle(q);
@@ -326,7 +369,7 @@ function select(id) {
 }
 
 function duplicate(q) {
-  const f = state.form;
+  const f = doc();
   const copy = structuredClone(q);
   copy.id = uid();
   copy.logic = [];
@@ -337,7 +380,7 @@ function duplicate(q) {
 }
 
 async function remove(q) {
-  const f = state.form;
+  const f = doc();
   if (!await confirmDialog('Hapus pertanyaan?', `"${questionTitle(q)}" dan aturan logikanya akan dihapus dari form.`, { okLabel: 'Hapus', danger: true })) return;
   const i = f.questions.indexOf(q);
   f.questions.splice(i, 1);
@@ -352,8 +395,8 @@ function showAddPreview(type) {
   document.querySelectorAll('#addGrid .add-item').forEach((b) => b.classList.toggle('is-preview', b.dataset.type === type));
   const q = sampleQuestion(type);
   const root = el('div', { class: 'ff' });
-  applyTheme(root, state.form.theme);
-  const screen = questionScreen({ ...state.form, questions: [q] }, q, { mode: 'live', answers: {}, hidden: {}, isLast: false, onSubmit: () => {} });
+  applyTheme(root, doc().theme);
+  const screen = questionScreen({ ...variantForm(state.form, state.variant), questions: [q] }, q, { mode: 'live', answers: {}, hidden: {}, isLast: false, onSubmit: () => {}, upload: async () => { throw new Error('Contoh saja.'); } });
   root.append(el('div', { class: 'ff-stage' }, screen.el));
   host.replaceChildren(
     el('div', { class: 'add-preview-frame', inert: true, 'aria-hidden': 'true' }, root),
@@ -393,7 +436,7 @@ function openAddDialog() {
 }
 
 function addQuestion(type) {
-  const f = state.form;
+  const f = doc();
   const q = newQuestion(type);
   const idx = f.questions.findIndex((x) => x.id === state.selected);
   f.questions.splice(idx === -1 ? f.questions.length : idx + 1, 0, q);
@@ -404,7 +447,7 @@ function addQuestion(type) {
 
 // ─── Canvas ─────────────────────────────────────────────────────────────────
 function recallOptions(q) {
-  const f = state.form;
+  const f = doc();
   const upto = q ? f.questions.indexOf(q) : f.questions.length;
   return [
     ...f.questions.slice(0, upto).filter((x) => x.type !== 'statement').map((x) => ({ token: x.id, label: plainTitle(x.title) || x.id, kind: QUESTION_TYPES[x.type].label })),
@@ -415,7 +458,7 @@ function recallOptions(q) {
 function renderCanvas() {
   const host = panel.querySelector('.bw-frame');
   if (!host) return;
-  const f = state.form;
+  const f = doc();
   const root = el('div', { class: 'ff ff-edit' });
   applyTheme(root, f.theme);
   const stage = el('div', { class: 'ff-stage' });
@@ -452,16 +495,34 @@ function renderCanvas() {
 
 /** Welcome, every question, ending: the order the canvas arrows step through. */
 function canvasOrder() {
-  return ['welcome', ...state.form.questions.map((q) => q.id), 'ending'];
+  return ['welcome', ...doc().questions.map((q) => q.id), 'ending'];
 }
 
 function canvasWhere() {
-  const f = state.form;
+  const f = doc();
   if (state.selected === 'welcome') return [el('span', { class: 'type-tile neutral' }, icon('welcome', { size: 14 })), f.welcome?.enabled === false ? 'Halaman pembuka (nonaktif)' : 'Halaman pembuka'];
   if (state.selected === 'ending') return [el('span', { class: 'type-tile neutral' }, icon('ending', { size: 14 })), 'Halaman akhir'];
   const i = f.questions.findIndex((q) => q.id === state.selected);
   const q = f.questions[i];
   return [typeTile(q.type), `Pertanyaan ${i + 1} dari ${f.questions.length}`];
+}
+
+/** A | B switch, shown once the form has a variant B. */
+function variantSwitch() {
+  if (!state.form.variants?.B) return null;
+  return el('div', { class: 'seg seg-variant', role: 'group', 'aria-label': 'Varian yang diedit' }, ['A', 'B'].map((v) => el('button', {
+    type: 'button', class: state.variant === v ? 'active' : '', 'aria-pressed': String(state.variant === v),
+    title: v === 'A' ? 'Edit versi asli' : 'Edit varian B (uji A/B)',
+    onclick: () => { if (state.variant !== v) { state.variant = v; state.selected = null; render(); } },
+  }, el('span', { class: `ab-letter ab-letter-${v} sm`, text: v }), v === 'A' ? 'Asli' : 'Varian')));
+}
+
+function variantNotice() {
+  if (state.variant !== 'B') return null;
+  const running = state.form.experiment?.status === 'running';
+  return el('p', { class: `variant-notice${running ? ' warn' : ''}` },
+    el('span', { class: 'tag', text: 'Varian B' }),
+    running ? 'Uji sedang berjalan: perubahan di sini ikut mengubah hasilnya.' : 'Anda mengedit varian B. Pengaturan Integrasi dan Bagikan berlaku untuk kedua varian.');
 }
 
 function renderCenter() {
@@ -470,7 +531,7 @@ function renderCenter() {
   const step = (d) => { const id = order[at + d]; if (id) select(id); };
   return el('section', { class: 'bw-center' },
     el('div', { class: 'bw-canvas-bar' },
-      el('div', {}, segmented([['desktop', 'Desktop'], ['mobile', 'Ponsel']], state.device, (v) => { state.device = v; render(); })),
+      el('div', { class: 'row', style: 'gap:8px;flex-wrap:nowrap' }, segmented([['desktop', 'Desktop'], ['mobile', 'Ponsel']], state.device, (v) => { state.device = v; render(); }), variantSwitch()),
       el('div', { class: 'canvas-where', 'aria-live': 'polite' }, canvasWhere()),
       el('div', { class: 'canvas-nav' },
         el('button', { class: 'icon-btn sm', type: 'button', title: 'Sebelumnya', 'aria-label': 'Layar sebelumnya', disabled: at <= 0, onclick: () => step(-1) }, icon('chevronUp', { size: 18 })),
@@ -487,11 +548,45 @@ function changeType(q, type) {
   markDirty(); render();
 }
 
+/**
+ * Image picker: upload a file (stored by the backend) or paste an https URL.
+ * Uploaded images in local mode are data URLs, so only a thumbnail is shown.
+ */
+function imageField(obj, key, label, hint) {
+  const picker = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', hidden: true });
+  const button = el('button', { class: 'btn-soft small', type: 'button', onclick: () => picker.click() }, icon('upload', { size: 14 }), obj[key] ? 'Ganti' : 'Unggah');
+  picker.addEventListener('change', async () => {
+    const file = picker.files[0];
+    picker.value = '';
+    if (!file) return;
+    button.disabled = true; button.lastChild.textContent = 'Mengunggah…';
+    try {
+      obj[key] = (await backend.uploadMedia(state.form.id, file)).url;
+      markDirty(); render();
+      toast('Gambar diunggah ✓');
+    } catch (err) {
+      toast(err.message, 'bad');
+      button.disabled = false; button.lastChild.textContent = obj[key] ? 'Ganti' : 'Unggah';
+    }
+  });
+  const value = obj[key] || '';
+  const inline = value.startsWith('data:');
+  return el('div', { class: 'field image-field' },
+    el('span', { text: label }),
+    value ? el('div', { class: 'image-chip' }, el('img', { src: value, alt: '' }),
+      el('span', { class: 'image-chip-name', text: inline ? 'Gambar diunggah' : value.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60) }),
+      el('button', { class: 'icon-btn sm', type: 'button', title: 'Hapus gambar', 'aria-label': 'Hapus gambar', onclick: () => { delete obj[key]; markDirty(); render(); } }, icon('close', { size: 14 }))) : null,
+    el('div', { class: 'row image-row' },
+      button, picker,
+      inline ? null : bind(obj, key, { type: 'url', canvas: true, placeholder: 'atau tempel URL https://…' })),
+    hint ? el('small', { class: 'muted', text: hint }) : null);
+}
+
 function imageSection(obj, { layouts = true } = {}) {
   const layout = obj.layout || 'stack';
   return el('div', { class: 'rp-section' },
     el('h4', { text: 'Gambar' }),
-    field('URL gambar (https)', bind(obj, 'imageUrl', { type: 'url', canvas: true, placeholder: 'https://…' })),
+    imageField(obj, 'imageUrl', 'Gambar pertanyaan'),
     layouts && obj.imageUrl ? el('div', { class: 'layout-picker' }, [['stack', 'Di bawah teks'], ['split-left', 'Kiri'], ['split-right', 'Kanan']].map(([v, label]) => el('button', {
       type: 'button', class: `layout-opt${layout === v ? ' active' : ''}`, 'aria-label': `Tata letak: ${label}`,
       onclick: () => { obj.layout = v; markDirty(); render(); },
@@ -542,6 +637,17 @@ function questionSettings(q) {
       field('Label kanan', bind(s, 'labelRight', { canvas: true, placeholder: 'mis. Sangat mungkin' })));
   }
   if (t === 'statement') opts.append(field('Teks tombol', bind(s, 'buttonText', { canvas: true, placeholder: 'Lanjut' })));
+  if (t === 'file_upload') {
+    const rules = fileRules(q);
+    opts.append(...[
+      field('Jenis file', segmented(Object.keys(FILE_KINDS).map((k) => [k, k === 'any' ? 'Semua' : FILE_KINDS[k].label]), rules.kind, (v) => { s.fileKind = v; markDirty(); render(); }), FILE_KINDS[rules.kind].hint),
+      field('Ukuran maksimal per file', segmented([2, 5, 10, 25].map((n) => [n, `${n} MB`]), rules.maxMb, (v) => { s.maxSizeMb = v; markDirty(); render(); })),
+      field('Jumlah file', selectEl([1, 2, 3, 5, 10].map((n) => [n, n === 1 ? '1 file' : `Sampai ${n} file`]), rules.maxFiles, (v) => { s.maxFiles = Number(v); markDirty(); render(); })),
+      el('p', { class: 'muted small', text: 'Hanya anggota tim yang sudah masuk yang bisa membuka file. File dari pengunjung yang tidak mengirim form dihapus otomatis setelah 24 jam.' }),
+      backend.name === 'cloud' && cloudInfo && cloudInfo.files === false
+        ? el('p', { class: 'bad small', text: 'Penyimpanan file (R2) belum aktif di Worker, jadi upload akan gagal. Lihat README bagian "Upload file".' }) : null,
+    ].filter(Boolean)); // Node.append(null) would print "null"
+  }
   parts.push(opts, imageSection(q));
   parts.push(el('div', { class: 'rp-section rp-footer' },
     el('span', { class: 'rp-id', title: 'Dipakai untuk {{id}} dan kolom data', text: `ID ${q.id}` }),
@@ -552,7 +658,8 @@ function questionSettings(q) {
 }
 
 function welcomeSettings() {
-  const w = state.form.welcome ||= { enabled: true };
+  const d = doc();
+  const w = d.welcome ||= { enabled: true };
   if (w.enabled === undefined) w.enabled = true;
   return [
     el('div', { class: 'rp-section' }, el('h4', { text: 'Halaman pembuka' }), toggle('Tampilkan halaman pembuka', w, 'enabled'),
@@ -562,7 +669,8 @@ function welcomeSettings() {
 }
 
 function endingSettings() {
-  const t = state.form.thankyou ||= {};
+  const d = doc();
+  const t = d.thankyou ||= {};
   return [el('div', { class: 'rp-section' },
     el('h4', { text: 'Halaman akhir' }),
     el('p', { class: 'muted small', text: 'Judul & deskripsi bisa diedit di kanvas. Ketik @ untuk menyebut nama responden.' }),
@@ -573,10 +681,10 @@ function endingSettings() {
 }
 
 // ─── Right panel: design ────────────────────────────────────────────────────
-function themeObject() {
-  const t = normalizeTheme(state.form.theme);
+function themeObject(d = doc()) {
+  const t = normalizeTheme(d.theme);
   delete t.primary; delete t.text; delete t.name;
-  state.form.theme = t;
+  d.theme = t;
   return t;
 }
 
@@ -606,9 +714,9 @@ function designPanel() {
     el('div', { class: 'rp-section' }, el('h4', { text: 'Warna' }),
       color('Pertanyaan', 'question'), color('Jawaban', 'answer'), color('Tombol', 'button'), color('Teks tombol', 'buttonText'), color('Latar', 'background')),
     el('div', { class: 'rp-section' }, el('h4', { text: 'Logo' }),
-      field('URL logo (https)', bind(t, 'logoUrl', { type: 'url', canvas: true, placeholder: 'https://…/logo.png' }), 'Tampil di pojok kiri atas setiap layar. PNG/SVG transparan, tinggi maksimal 36px.')),
+      imageField(t, 'logoUrl', 'Logo', 'Tampil di pojok kiri atas setiap layar. PNG transparan, tinggi maksimal 36px.')),
     el('div', { class: 'rp-section' }, el('h4', { text: 'Gambar latar' }),
-      field('URL gambar (https)', bind(t, 'backgroundImage', { type: 'url', canvas: true, placeholder: 'https://…' })),
+      imageField(t, 'backgroundImage', 'Gambar latar'),
       t.backgroundImage ? field('Kecerahan', el('input', { type: 'range', min: -80, max: 80, step: 5, value: t.brightness, oninput: (e) => set('brightness')(Number(e.target.value)) }), 'Geser kiri untuk menggelapkan, kanan untuk mencerahkan.') : null),
     el('div', { class: 'rp-section' }, el('h4', { text: 'Tata letak' }),
       field('Sudut', segmented([['none', 'Tajam'], ['small', 'Kecil'], ['large', 'Besar']], t.corners, set('corners', true))),
@@ -623,7 +731,7 @@ function renderRight() {
   if (state.side === 'design') body = designPanel();
   else if (sel === 'welcome') body = welcomeSettings();
   else if (sel === 'ending') body = endingSettings();
-  else body = questionSettings(state.form.questions.find((q) => q.id === sel));
+  else body = questionSettings(doc().questions.find((q) => q.id === sel));
   return el('aside', { class: 'bw-right' },
     el('div', { class: 'rp-tabs' },
       el('button', { type: 'button', class: state.side === 'settings' ? 'active' : '', onclick: () => { state.side = 'settings'; render(); } }, icon('settings', { size: 15 }), 'Pengaturan'),
@@ -638,18 +746,20 @@ function renderContent() {
 
 // ─── Logic tab ──────────────────────────────────────────────────────────────
 function renderLogic() {
-  const f = state.form;
+  const f = doc();
   const problems = findLogicProblems(f);
   return el('div', { class: 'bw-page' },
-    el('div', { class: 'page-head' },
-      el('h1', { text: 'Logika' }),
-      el('p', { text: 'Arahkan responden ke pertanyaan lain berdasarkan jawabannya. Aturan dicek dari atas ke bawah, dan aturan pertama yang cocok yang dipakai.' })),
+    el('div', { class: 'page-head page-head-row' },
+      el('div', {},
+        el('h1', { text: 'Logika' }),
+        el('p', { text: 'Arahkan responden ke pertanyaan lain berdasarkan jawabannya. Aturan dicek dari atas ke bawah, dan aturan pertama yang cocok yang dipakai.' })),
+      variantSwitch()),
     problems.length ? el('div', { class: 'callout warn' }, el('strong', { text: 'Perlu dicek' }), el('ul', {}, problems.map((p) => el('li', { text: p })))) : null,
     el('div', { class: 'logic-list' }, f.questions.map((q, idx) => logicItem(q, idx))));
 }
 
 function logicTargets(idx) {
-  const f = state.form;
+  const f = doc();
   return [
     ...f.questions.map((q, i) => [q.id, qLabel(q, i)]).filter((_, i) => i !== idx),
     [END, 'Halaman akhir (kirim form)'],
@@ -657,7 +767,7 @@ function logicTargets(idx) {
 }
 
 function logicItem(q, idx) {
-  const f = state.form;
+  const f = doc();
   const rules = q.logic || [];
   const nextSelect = selectEl([['', 'pertanyaan berikutnya'], ...logicTargets(idx)], q.next || '', (v) => { if (v) q.next = v; else delete q.next; markDirty(); },
     { class: 'pill-select', 'aria-label': `Selain itu, setelah "${questionTitle(q)}" lanjut ke` });
@@ -678,7 +788,7 @@ function logicItem(q, idx) {
 
 /** One rule, written as a sentence: Jika [field] [op] [value] dan … lompat ke [target]. */
 function ruleBlock(q, rule, ri, idx) {
-  const f = state.form;
+  const f = doc();
   const fieldOptions = [
     ...f.questions.filter((x) => x.type !== 'statement').map((x) => [x.id, qLabel(x, f.questions.indexOf(x))]),
     ...(f.hiddenFields || []).map((h) => [h, `Parameter URL: ${h}`]),
@@ -786,7 +896,7 @@ function renderConnect() {
 
 function recoveryCard(f) {
   const rec = f.recovery ||= { partials: false, resume: false };
-  const hasContact = f.questions.some((q) => q.type === 'email' || q.type === 'phone');
+  const hasContact = allQuestions(f).some((q) => q.type === 'email' || q.type === 'phone');
   return el('section', { class: 'card card-span' },
     el('h3', { text: 'Pemulihan jawaban yang belum selesai' }),
     el('p', { class: 'muted small', text: 'Rata-rata 1 dari 3 orang yang mulai mengisi form berhenti di tengah (benchmark Zuko). Fitur ini membantu tim menghubungi mereka dan membiarkan responden melanjutkan.' }),
@@ -857,6 +967,76 @@ function renderShare() {
       el('pre', { text: m.code })));
 }
 
+// ─── A/B tab ────────────────────────────────────────────────────────────────
+function renderAb() {
+  const f = state.form;
+  const publish = async (msg) => { markDirty(); await save(); if (!state.dirty) toast(msg); };
+  return renderAbTab({
+    form: f,
+    canEdit: canEdit(),
+    backend,
+    createVariant: () => {
+      f.variants = { B: structuredClone(Object.fromEntries(VARIANT_KEYS.map((k) => [k, f[k]]))) };
+      f.experiment = { id: uid('x'), status: 'draft', split: 50 };
+      state.variant = 'B'; state.selected = null; state.tab = 'content';
+      markDirty(); render();
+      toast('Varian B dibuat dari salinan form. Ubah satu hal, lalu mulai uji di tab Uji A/B.');
+    },
+    deleteVariant: async () => {
+      if (!await confirmDialog('Hapus varian B?', 'Semua perubahan di varian B hilang. Versi asli (A) tidak berubah.', { okLabel: 'Hapus', danger: true })) return;
+      delete f.variants; delete f.experiment;
+      state.variant = 'A';
+      markDirty(); render();
+    },
+    editVariant: (v) => { state.variant = v; state.selected = null; state.tab = 'content'; render(); },
+    preview: (v) => openPreview(false, v),
+    setSplit: (n) => { f.experiment.split = n; markDirty(); },
+    start: async (split) => {
+      const resume = f.experiment.status === 'paused';
+      const text = resume
+        ? 'Form diterbitkan sekarang dan pengunjung kembali dibagi ke A dan B.'
+        : `Form diterbitkan sekarang. ${split}% pengunjung baru akan melihat varian B, sisanya versi asli. Pengunjung yang pernah datang tetap di versinya.`;
+      if (!await confirmDialog(resume ? 'Lanjutkan uji A/B?' : 'Mulai uji A/B?', text, { okLabel: resume ? 'Lanjutkan' : 'Mulai uji' })) return;
+      Object.assign(f.experiment, { status: 'running', split, startedAt: f.experiment.startedAt || new Date().toISOString() });
+      await publish(resume ? 'Uji A/B dilanjutkan ✓' : 'Uji A/B dimulai ✓');
+    },
+    pause: async () => {
+      if (!await confirmDialog('Jeda uji A/B?', 'Selama dijeda, semua pengunjung melihat versi asli (A). Hasil yang sudah terkumpul tetap ada.', { okLabel: 'Jeda' })) return;
+      f.experiment.status = 'paused';
+      await publish('Uji A/B dijeda');
+    },
+    end: async (_winner, snapshot) => {
+      const winner = await chooseWinner(snapshot);
+      if (!winner) return;
+      endExperiment(f, winner, snapshot);
+      state.variant = 'A';
+      await publish(winner === 'B' ? 'Varian B sekarang dipakai untuk semua pengunjung ✓' : 'Uji selesai. Versi asli tetap dipakai.');
+    },
+  });
+}
+
+/** Asks which version to keep; resolves 'A', 'B' or null (cancel). */
+function chooseWinner(snapshot) {
+  const dlg = document.getElementById('confirmDialog');
+  const rate = (v) => (snapshot?.[v]?.views ? `${((snapshot[v].completions / snapshot[v].views) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–');
+  document.getElementById('confirmTitle').textContent = 'Akhiri uji A/B';
+  const text = document.getElementById('confirmText');
+  text.textContent = `Konversi sejauh ini: A ${rate('A')}, B ${rate('B')}. Versi mana yang dipakai untuk semua pengunjung? Hasil uji tetap tersimpan di riwayat.`;
+  const ok = document.getElementById('confirmOk');
+  const keepA = el('button', { class: 'btn-ghost', type: 'submit', value: 'A', text: 'Pakai A (asli)' });
+  ok.textContent = 'Pakai B';
+  ok.value = 'B';
+  ok.classList.remove('danger');
+  ok.before(keepA);
+  dlg.returnValue = '';
+  dlg.showModal();
+  return new Promise((resolve) => dlg.addEventListener('close', () => {
+    keepA.remove();
+    ok.value = 'ok';
+    resolve(['A', 'B'].includes(dlg.returnValue) ? dlg.returnValue : null);
+  }, { once: true }));
+}
+
 // ─── Results tab ────────────────────────────────────────────────────────────
 function renderResults() {
   return el('div', { class: 'bw-page bw-page-wide' });
@@ -865,19 +1045,23 @@ function renderResults() {
 // ─── Preview dialog ─────────────────────────────────────────────────────────
 let previewHandle = null;
 let previewLive = false;
+let previewVariant = 'A';
 /**
  * live=false: Typeform-style preview, nothing is saved.
  * live=true (preview Artifact only): the published form, answers saved to this browser and shown in Results.
  */
-function openPreview(live = false) {
+function openPreview(live = false, variant = state.variant) {
   previewLive = live === true;
+  previewVariant = variant;
   const dlg = document.getElementById('previewDialog');
   const frame = document.getElementById('previewFrame');
-  dlg.querySelector('.preview-bar strong').textContent = previewLive ? 'Form (jawaban disimpan)' : 'Pratinjau';
+  const hasB = !!state.form.variants?.B;
+  dlg.querySelector('.preview-bar strong').textContent = previewLive ? 'Form (jawaban disimpan)' : hasB ? `Pratinjau varian ${variant}` : 'Pratinjau';
   const start = () => {
     previewHandle?.destroy();
     // A copy, so answering the preview never touches the draft being edited.
-    previewHandle = mountForm(frame, structuredClone(state.form), previewLive
+    // The live form assigns A/B itself, like for any visitor.
+    previewHandle = mountForm(frame, structuredClone(previewLive ? state.form : variantForm(state.form, variant)), previewLive
       ? { backend, embedded: true, params: new URLSearchParams('utm_source=pratinjau'), onRestart: start }
       : { preview: true, embedded: true, onRestart: start });
   };
@@ -890,7 +1074,7 @@ function setupPreview() {
   const frame = document.getElementById('previewFrame');
   document.getElementById('previewClose').append(icon('close', { size: 18 }));
   document.getElementById('previewClose').addEventListener('click', () => dlg.close());
-  document.getElementById('previewRestart').addEventListener('click', () => openPreview(previewLive));
+  document.getElementById('previewRestart').addEventListener('click', () => openPreview(previewLive, previewVariant));
   document.querySelectorAll('#previewDevice button').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('#previewDevice button').forEach((x) => x.classList.toggle('active', x === b));
     frame.classList.toggle('mobile', b.dataset.device === 'mobile');
@@ -902,12 +1086,26 @@ function setupPreview() {
 }
 
 // ─── Render / persistence ───────────────────────────────────────────────────
+/** Shows only what the member's role can use (the Worker enforces the same rules). */
+function applyRole() {
+  const role = state.user?.role || 'owner';
+  const tabs = allowedTabs(role);
+  if (!tabs.includes(state.tab)) state.tab = 'results';
+  document.querySelectorAll('.tb-tabs [data-tab]').forEach((b) => { b.hidden = !tabs.includes(b.dataset.tab); });
+  const edit = canEdit();
+  for (const id of ['save', 'saveStatus']) document.getElementById(id).hidden = !edit;
+  document.querySelector('.tb-divider').hidden = !edit;
+  titleInput.readOnly = !edit;
+  titleInput.title = edit ? '' : 'Peran Anda hanya bisa melihat';
+}
+
 function render() {
+  applyRole();
   document.querySelectorAll('.tb-tabs [data-tab]').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === state.tab);
     b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
   });
-  const views = { content: renderContent, logic: renderLogic, connect: renderConnect, share: renderShare, results: renderResults };
+  const views = { content: renderContent, logic: renderLogic, connect: renderConnect, share: renderShare, ab: renderAb, results: renderResults };
   const scroller = panel.querySelector('.bw-page, .rp-body');
   const scroll = scroller?.scrollTop || 0;
   panel.className = `bw bw-tab-${state.tab}`;
@@ -932,7 +1130,7 @@ function render() {
 }
 
 async function refreshPicker() {
-  try { state.forms = await backend.listForms(); } catch (err) { state.forms = []; toast(err.message, 'bad'); }
+  try { state.forms = await backend.listForms(); } catch (err) { state.forms = []; if (err.status !== 401) toast(err.message, 'bad'); }
   const known = state.forms.some((f) => f.id === state.form.id);
   // The select always reads "Form saya"; the open form's name lives in the title field next to it.
   const mark = (id) => (id === state.form.id ? '✓ ' : '\u2003');
@@ -941,19 +1139,22 @@ async function refreshPicker() {
     el('optgroup', { label: 'Form saya' },
       ...(known ? [] : [el('option', { value: state.form.id, text: `${mark(state.form.id)}${state.form.title || 'Tanpa judul'} (draf)` })]),
       ...state.forms.map((f) => el('option', { value: f.id, text: `${mark(f.id)}${f.title || f.id}` }))),
-    el('option', { value: '__new', text: '＋ Buat form baru' }),
+    ...(canEdit() ? [el('option', { value: '__new', text: '＋ Buat form baru' })] : []),
   );
   picker.value = '__ws';
   state.sheetUrl = state.forms.find((f) => f.id === state.form.id)?.sheetUrl || state.sheetUrl;
 }
 
 async function save() {
+  if (!canEdit()) return;
   const btn = document.getElementById('save');
   btn.disabled = true; btn.textContent = 'Menerbitkan…';
   try {
-    themeObject();
+    themeObject(state.form);
+    if (state.form.variants?.B) themeObject(state.form.variants.B);
     const { form, sheetUrl } = await backend.saveForm(state.form);
     state.form = form;
+    normalizeVariants(state.form);
     state.sheetUrl = sheetUrl || state.sheetUrl;
     state.dirty = false;
     toast(sheetUrl ? 'Terbit ✓ Google Sheet siap.' : 'Terbit ✓');
@@ -971,7 +1172,8 @@ async function save() {
 async function openForm(id) {
   try {
     state.form = await backend.getForm(id);
-    state.selected = null; state.dirty = false; state.sheetUrl = '';
+    state.selected = null; state.dirty = false; state.sheetUrl = ''; state.variant = 'A';
+    normalizeVariants(state.form);
     setUrl(`?id=${encodeURIComponent(id)}`);
     await refreshPicker();
     render();
@@ -983,7 +1185,7 @@ async function openForm(id) {
 }
 
 function newForm() {
-  state.form = blankForm(); state.selected = null; state.dirty = true; state.sheetUrl = '';
+  state.form = blankForm(); state.selected = null; state.dirty = true; state.sheetUrl = ''; state.variant = 'A';
   state.tab = 'content';
   setUrl('');
   refreshPicker().then(render);
@@ -1021,17 +1223,54 @@ function setupSettings() {
     backend = getBackend();
     cloudInfo = null;
     toast('Pengaturan disimpan.');
+    await signInIfNeeded();
     await refreshPicker();
     render();
   });
 }
 
+// ─── Accounts ───────────────────────────────────────────────────────────────
+let team = null;
+
+/** Cloudflare: a signed-in member. Local: the simulated member. Apps Script: the admin key (no accounts). */
+async function signInIfNeeded() {
+  if (backend.team === 'real') {
+    const link = /(^|&)(join|reset)=/.test(location.hash.slice(1));
+    const s = link ? null : await backend.session().catch(() => null);
+    state.user = s?.user || await team.signIn();
+  } else if (backend.team === 'simulated') {
+    state.user = (await backend.session()).user;
+  } else {
+    state.user = null;
+  }
+  mountAccountMenu();
+}
+
+function mountAccountMenu() {
+  team.mountAccount(state.user, {
+    onViewAs: backend.team === 'simulated' ? async (role) => {
+      await backend.viewAs(role);
+      state.user = (await backend.session()).user;
+      mountAccountMenu();
+      await refreshPicker();
+      render();
+      toast(`Sekarang melihat sebagai ${ROLES[role].label}`);
+    } : null,
+    onSignOut: backend.team === 'real' ? async () => {
+      if (state.dirty && !await confirmDialog('Keluar sekarang?', 'Ada perubahan yang belum diterbitkan. Perubahan itu akan hilang.', { okLabel: 'Keluar' })) return;
+      state.dirty = false;
+      await backend.logout();
+      location.reload();
+    } : null,
+  });
+}
+
 /** The preview's example data is rebuilt when the demo gains features (bump DEMO_VERSION). */
-const DEMO_VERSION = '2';
+const DEMO_VERSION = '3';
 function resetOutdatedDemo() {
   try {
     if (localStorage.getItem('tf_demo_version') === DEMO_VERSION) return;
-    Object.keys(localStorage).filter((k) => k.startsWith('tf_') || k.startsWith('ff_progress_')).forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => k.startsWith('tf_') || k.startsWith('ff_progress_') || k.startsWith('ff_ab_')).forEach((k) => localStorage.removeItem(k));
     localStorage.setItem('tf_demo_version', DEMO_VERSION);
   } catch { /* storage unavailable */ }
 }
@@ -1064,9 +1303,17 @@ async function init() {
   });
 
   if (DEMO) resetOutdatedDemo();
+  team = createTeamUI({ getBackend: () => backend, toast, confirmDialog, copyText });
+  // A request answered 401 (session expired or ended by an admin): sign in again, keep unpublished edits.
+  let reauth = null;
+  window.addEventListener('formflow:signed-out', () => {
+    reauth ||= team.signIn({ reason: 'Sesi Anda berakhir. Masuk lagi untuk melanjutkan. Perubahan yang belum terbit tetap ada.' })
+      .then(async (user) => { state.user = user; reauth = null; mountAccountMenu(); await refreshPicker(); render(); });
+  });
+  await signInIfNeeded();
   const id = new URLSearchParams(location.search).get('id');
   const tab = location.hash.slice(1);
-  if (['content', 'logic', 'connect', 'share', 'results'].includes(tab)) state.tab = tab;
+  if (['content', 'logic', 'connect', 'share', 'ab', 'results'].includes(tab)) state.tab = tab;
   state.form = blankForm();
   // A stale ?id= (deleted form, other browser) falls through to the normal start instead of a blank page.
   if (id && await openForm(id)) return;
@@ -1076,8 +1323,11 @@ async function init() {
   if (DEMO) {
     // First visit to the preview: publish the sample form and fill Results with labelled example data.
     try {
+      const demo = await import('./demo.js');
+      state.form = demo.demoForm(state.form);
       await backend.saveForm(state.form);
-      (await import('./demo.js')).seedExampleData(state.form);
+      await demo.seedExampleData(state.form);
+      await signInIfNeeded(); // the example team replaces the default one
       await openForm(state.form.id);
       return;
     } catch { /* storage blocked: continue with an unsaved draft */ }

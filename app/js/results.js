@@ -4,9 +4,11 @@
 // it runs both as a tab inside the builder and on dashboard.html.
 import { el } from './dom.js';
 import { computeStats, toCSV, partialsCSV } from './stats.js';
-import { plainTitle, whatsappLink, partialsEnabled } from './logic.js';
+import { plainTitle, whatsappLink, partialsEnabled, allQuestions, isFileList, formatBytes } from './logic.js';
 import { icon } from './icons.js';
 import { typeTile } from './types.js';
+import { compareVariants } from './ab.js';
+import { DEVICES } from './traffic.js';
 
 const SERIES = { views: '#D9A300', completions: '#3967BD' }; // validated pair (CVD ΔE 32.6)
 const FLOW = { open: '#B7C2D6', question: '#3967BD', done: '#2A4F9A', ribbon: 'rgba(57,103,189,.10)', leak: 'rgba(245,184,0,.62)' };
@@ -22,6 +24,25 @@ function svg(tag, attrs = {}) {
 
 // ─── Headline ───────────────────────────────────────────────────────────────
 /** One sentence that says what happened, then what to look at. */
+/**
+ * The segment (device or source) converting clearly worse than the rest of
+ * the visitors: two-proportion test, p < 0.05, at least 30 visitors.
+ */
+export function weakestSegment(s) {
+  let worst = null;
+  for (const dim of ['device', 'source']) {
+    for (const [value, seg] of Object.entries(s.segments?.[dim] || {})) {
+      const rest = { views: s.views - seg.views, completions: s.completions - seg.completions };
+      if (seg.views < 30 || rest.views < 30) continue;
+      const c = compareVariants(rest, seg); // "B" = this segment
+      if (c.pValue < 0.05 && c.diff < 0 && (!worst || c.diff < worst.diff)) worst = { dim, value, rate: c.rateB, rest: c.rateA, diff: c.diff };
+    }
+  }
+  return worst;
+}
+
+const segLabel = (dim, v) => (dim === 'device' ? DEVICES[v] || v : v);
+
 function hero(s, form, partials, days, onPartials) {
   if (!s.views && !s.completions) {
     return el('section', { class: 'res-hero' },
@@ -32,11 +53,15 @@ function hero(s, form, partials, days, onPartials) {
     ? el('h2', { class: 'res-headline' }, el('span', { class: 'hl', text: pct(Math.min(1, s.completionRate)) }), ' pengunjung mengirim form.')
     : el('h2', { class: 'res-headline', text: `${fmt.format(s.completions)} orang mengirim form.` });
   const worst = [...s.funnel].sort((a, b) => b.droppedHere - a.droppedHere)[0];
-  const qNum = worst ? form.questions.filter((q) => q.type !== 'statement').findIndex((q) => q.id === worst.id) + 1 : 0;
+  const qNum = worst ? allQuestions(form).filter((q) => q.type !== 'statement').findIndex((q) => q.id === worst.id) + 1 : 0;
+  const weak = weakestSegment(s);
   const lede = el('p', { class: 'res-lede' },
     s.views ? [el('strong', { text: fmt.format(s.completions) }), ` dari ${fmt.format(s.views)} pengunjung dalam ${days} hari terakhir. `] : `Dalam ${days} hari terakhir. `,
     worst && worst.droppedHere
       ? ['Paling banyak berhenti di pertanyaan ', el('strong', { text: `${qNum}, “${worst.title}”` }), `: ${fmt.format(worst.droppedHere)} orang (${pct(worst.dropRate)}). `]
+      : null,
+    weak
+      ? [weak.dim === 'device' ? 'Pengunjung ' : 'Pengunjung dari ', el('strong', { text: segLabel(weak.dim, weak.value) }), ` hanya ${pct(weak.rate)} yang mengirim, dibanding ${pct(weak.rest)} untuk yang lain. `]
       : null,
     partialsEnabled(form) && partials.length
       ? el('a', { href: '#res-partials', onclick: (e) => { e.preventDefault(); onPartials(); } }, `${fmt.format(partials.length)} kontak yang belum mengirim bisa dihubungi →`)
@@ -51,7 +76,7 @@ function hero(s, form, partials, days, onPartials) {
  * where most people quit is marked in yellow.
  */
 function flowChart(s, form) {
-  const byId = Object.fromEntries(form.questions.map((q) => [q.id, q]));
+  const byId = Object.fromEntries(allQuestions(form).map((q) => [q.id, q]));
   const steps = [
     { key: 'open', title: 'Membuka form', count: s.views },
     ...s.funnel.map((f, i) => ({ key: f.id, title: f.title, count: f.reached, dropped: f.droppedHere, dropRate: f.dropRate, q: byId[f.id], n: i + 1 })),
@@ -237,6 +262,47 @@ function bars(entries, { color = '#3967BD', percentOf } = {}) {
     el('span', { class: 'hbar-value' }, el('strong', { text: fmt.format(v) }), percentOf ? ` · ${pct(v / percentOf)}` : null))));
 }
 
+/**
+ * Conversion per device or source. Each bar is the segment's conversion; the
+ * thin mark is the average of all visitors. A segment converting clearly worse
+ * than the rest (two-proportion test, p < 0.05, ≥ 30 visitors) is flagged.
+ */
+function segmentCard(title, dim, s, { limit = 8 } = {}) {
+  let entries = Object.entries(s.segments?.[dim] || {}).filter(([, v]) => v.views || v.completions);
+  if (dim === 'device') entries.sort((a, b) => Object.keys(DEVICES).indexOf(a[0]) - Object.keys(DEVICES).indexOf(b[0]));
+  else entries.sort((a, b) => b[1].views - a[1].views || b[1].completions - a[1].completions);
+  if (entries.length > limit) {
+    const rest = entries.slice(limit - 1).reduce((acc, [, v]) => ({ views: acc.views + v.views, starts: acc.starts + v.starts, completions: acc.completions + v.completions }), { views: 0, starts: 0, completions: 0 });
+    entries = [...entries.slice(0, limit - 1), [`Lainnya (${entries.length - limit + 1})`, rest]];
+  }
+  const overall = s.views ? Math.min(1, s.completions / s.views) : 0;
+  // The narrow device card only names the marker; the wide source card also defines conversion.
+  const head = el('div', { class: 'card-head' }, el('h3', { text: title }),
+    el('span', { class: 'muted', text: `${dim === 'source' ? 'konversi = terkirim ÷ pengunjung · ' : ''}garis = rata-rata ${pct(overall)}` }));
+  if (!entries.length) return el('section', { class: `card seg-card seg-${dim}` }, head, el('p', { class: 'muted', style: 'margin:0', text: 'Belum ada data.' }));
+  const flagged = (v) => {
+    const rest = { views: s.views - v.views, completions: s.completions - v.completions };
+    if (v.views < 30 || rest.views < 30) return false;
+    const c = compareVariants(rest, v);
+    return c.pValue < 0.05 && c.diff < 0;
+  };
+  return el('section', { class: `card seg-card seg-${dim}` }, head,
+    el('ul', { class: 'seg-list' }, entries.map(([value, v]) => {
+      const rate = v.views ? Math.min(1, v.completions / v.views) : null;
+      const low = flagged(v);
+      const label = segLabel(dim, value);
+      return el('li', { class: `seg-row${low ? ' is-low' : ''}`, 'aria-label': `${label}: konversi ${rate === null ? 'tidak ada' : pct(rate)}, ${v.views} pengunjung, ${v.completions} terkirim${low ? ', di bawah rata-rata' : ''}` },
+        el('div', { class: 'seg-top' },
+          el('span', { class: 'seg-name', text: label }),
+          low ? el('span', { class: 'tag', title: 'Konversinya jelas di bawah pengunjung lain (uji dua proporsi, p < 0,05)', text: 'di bawah rata-rata' }) : null,
+          el('strong', { class: 'seg-rate', text: rate === null ? '–' : pct(rate) })),
+        el('div', { class: 'seg-bar', 'aria-hidden': 'true' },
+          el('i', { style: `width:${(rate || 0) * 100}%` }),
+          s.views ? el('b', { style: `left:${overall * 100}%` }) : null),
+        el('div', { class: 'seg-sub', text: `${fmt.format(v.views)} pengunjung · ${fmt.format(v.completions)} terkirim` }));
+    })));
+}
+
 function funnelTable(funnel) {
   const top = Math.max(1, ...funnel.map((f) => f.reached));
   return el('div', { class: 'table-wrap', style: 'margin-top:14px' }, el('table', { class: 'data' },
@@ -266,9 +332,25 @@ function scaleHistogram(q, counts, question) {
       el('span', {}, el('i', { style: 'background:#3967BD' }), 'Promotor 9–10')) : null);
 }
 
-function questionCard(q, form) {
-  const question = form.questions.find((x) => x.id === q.id);
-  const n = form.questions.filter((x) => x.type !== 'statement').findIndex((x) => x.id === q.id) + 1;
+/** A link to an uploaded file; local (browser) files resolve their link asynchronously. */
+function fileChip(f, backend, { thumb = false } = {}) {
+  const image = /^image\/(jpeg|png|gif|webp)$/.test(f.type || '');
+  const a = el('a', { class: `file-chip${thumb && image ? ' has-thumb' : ''}`, target: '_blank', rel: 'noopener', title: `${f.name} · ${formatBytes(f.size)}` },
+    thumb && image ? el('img', { alt: '', loading: 'lazy' }) : icon('file', { size: 14 }),
+    el('span', { text: f.name }));
+  Promise.resolve(backend?.fileLink?.(f)).then((href) => {
+    if (!href) { a.classList.add('is-missing'); a.title = `${f.name}: file tidak tersedia di browser ini`; return; }
+    a.href = href;
+    const img = a.querySelector('img');
+    if (img) img.src = href;
+  });
+  return a;
+}
+
+function questionCard(q, form, backend) {
+  const qs = allQuestions(form);
+  const question = qs.find((x) => x.id === q.id);
+  const n = qs.filter((x) => x.type !== 'statement').findIndex((x) => x.id === q.id) + 1;
   const head = el('div', { class: 'card-head' },
     el('div', { class: 'row', style: 'gap:10px;flex-wrap:nowrap;min-width:0' }, question ? typeTile(question.type, n) : null, el('h3', { text: q.title })),
     el('span', { class: 'muted', style: 'white-space:nowrap', text: `${fmt.format(q.answered)} jawaban` }));
@@ -287,6 +369,10 @@ function questionCard(q, form) {
         q.counts ? null : stat('Rentang', `${fmt1(q.min)}–${fmt1(q.max)}`)),
       q.counts ? scaleHistogram(q, q.counts, question) : null,
       q.nps !== undefined ? el('p', { class: 'muted small', style: 'margin:10px 0 0', text: 'NPS = % promotor dikurangi % detraktor, dari −100 sampai 100.' }) : null);
+  } else if (q.kind === 'files') {
+    body = el('div', {},
+      el('div', { class: 'file-grid' }, q.files.slice(0, 6).map((f) => fileChip(f, backend, { thumb: true }))),
+      el('p', { class: 'muted small', style: 'margin:10px 0 0', text: 'File terbaru. Hanya anggota tim yang bisa membukanya.' }));
   } else {
     body = el('ul', { class: 'recent' }, q.recent.map((t) => el('li', { text: t.length > 160 ? `${t.slice(0, 160)}…` : t })));
   }
@@ -295,8 +381,8 @@ function questionCard(q, form) {
 
 const NOWRAP_TYPES = new Set(['phone', 'email', 'date', 'number']);
 
-function responsesTable(form, rows) {
-  const qs = form.questions.filter((q) => q.type !== 'statement');
+function responsesTable(form, rows, backend) {
+  const qs = allQuestions(form).filter((q) => q.type !== 'statement');
   if (!rows.length) return el('p', { class: 'empty-state', text: 'Belum ada jawaban pada rentang ini.' });
   return el('div', { class: 'table-wrap' }, el('table', { class: 'data' },
     el('thead', {}, el('tr', {}, el('th', { text: 'Waktu' }), qs.map((q) => el('th', { text: plainTitle(q.title) })), el('th', { text: 'Sumber' }))),
@@ -304,10 +390,11 @@ function responsesTable(form, rows) {
       el('td', { class: 'nowrap', text: new Date(r.submittedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }),
       qs.map((q) => {
         const v = r.answers?.[q.id];
+        if (isFileList(v)) return el('td', {}, el('div', { class: 'file-cell' }, v.map((f) => fileChip(f, backend))));
         // Phone numbers and emails are unreadable once they wrap mid-value.
         return el('td', { class: NOWRAP_TYPES.has(q.type) ? 'nowrap' : null, text: Array.isArray(v) ? v.join(', ') : String(v ?? '') });
       }),
-      el('td', { text: r.hidden?.utm_source || '(langsung)' }))))));
+      el('td', { text: r.meta?.source || r.hidden?.utm_source || '(langsung)' }))))));
 }
 
 function downloadCSV(name, csv) {
@@ -417,17 +504,14 @@ export function mountResults(host, { backend, formId, form: givenForm = null, de
         partialsEnabled(form) ? kpi('Kontak belum kirim', fmt.format(partials.length), 'bisa dihubungi') : null),
       el('div', { class: 'grid2 res-duo' },
         trendCard(s.daily),
-        el('section', { class: 'card' },
-          el('div', { class: 'card-head' }, el('h3', { text: 'Sumber pengunjung' }), el('span', { class: 'muted', text: 'dari utm_source' })),
-          Object.keys(s.sources).length
-            ? bars(Object.entries(s.sources).sort((a, b) => b[1] - a[1]).slice(0, 8), { percentOf: s.completions })
-            : el('p', { class: 'muted', style: 'margin:0', text: 'Belum ada data.' }))),
+        segmentCard('Per perangkat', 'device', s)),
+      segmentCard('Per sumber', 'source', s),
       partialsSection(form, partials, { canDownload }),
       el('h2', { class: 'section-title', text: 'Jawaban per pertanyaan' }),
-      el('div', { class: 'grid2' }, s.perQuestion.map((q) => questionCard(q, form))),
+      el('div', { class: 'grid2' }, s.perQuestion.map((q) => questionCard(q, form, backend))),
       el('section', { class: 'card' },
         el('div', { class: 'card-head' }, el('h3', { text: 'Jawaban terbaru' }), el('span', { class: 'muted', text: `${fmt.format(latest.length)} dari ${fmt.format(totalInRange)}` })),
-        responsesTable(form, latest)),
+        responsesTable(form, latest, backend)),
     );
   }
 

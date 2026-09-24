@@ -7,6 +7,11 @@
  * and, for forms with abandonment recovery on, "Belum selesai" (unfinished
  * responses that already contain an email or phone number).
  *
+ * Files uploaded by respondents go to a private Google Drive folder per form
+ * ("FormFlow Uploads"), shared with the form's sheet editors; the "Uploads"
+ * tab tracks them so files of visits that never submit are deleted after a day.
+ * Team accounts need the Cloudflare backend; here the admin key is the login.
+ *
  * Script Properties (Project Settings → Script properties):
  *   ADMIN_KEY          required. Secret used by the builder & dashboard.
  *   FB_CAPI_TOKEN      optional. Meta Conversions API access token.
@@ -20,6 +25,8 @@
  */
 
 var MAX_BODY = 100 * 1000; // bytes
+var MAX_UPLOAD_BODY = 14 * 1000 * 1000; // a 10 MB file, base64-encoded, plus JSON
+var MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // Apps Script handles up to ~50 MB, but uploads this big are slow
 var MAX_VALUE = 5000; // chars per answer cell
 var CHUNK = 45000; // Sheets cell limit is 50,000 chars
 var FORM_CACHE_SEC = 600;
@@ -39,11 +46,14 @@ function doGet(e) {
 function doPost(e) {
   try {
     var raw = (e && e.postData && e.postData.contents) || '';
-    if (raw.length > MAX_BODY) throw new Error('Payload terlalu besar.');
+    if (raw.length > MAX_UPLOAD_BODY) throw new Error('Payload terlalu besar.');
     var body = JSON.parse(raw || '{}');
+    if (raw.length > MAX_BODY && body.action !== 'upload' && body.action !== 'media') throw new Error('Payload terlalu besar.');
     switch (body.action) {
       case 'submit': return json_(submit_(body));
       case 'event': return json_(logEvent_(body));
+      case 'upload': return json_(upload_(body));
+      case 'media': requireAdmin_(body); return json_(media_(body));
       case 'saveForm': requireAdmin_(body); return json_(saveForm_(body.form));
       case 'listForms': requireAdmin_(body); return json_({ ok: true, forms: listForms_() });
       case 'deleteForm': requireAdmin_(body); return json_(deleteForm_(body.id));
@@ -113,6 +123,42 @@ function plainTitle_(t) {
 function sha256_(s) {
   var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8);
   return bytes.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+// ─── A/B variants (same rules as app/js/logic.js) ───────────────────────────
+var VARIANT_KEYS = ['welcome', 'questions', 'thankyou', 'theme'];
+
+function variantForm_(form, v) {
+  var b = v === 'B' && form.variants && form.variants.B;
+  if (!b) return form;
+  var out = {};
+  Object.keys(form).forEach(function (k) { out[k] = form[k]; });
+  VARIANT_KEYS.forEach(function (k) { if (b[k] !== undefined) out[k] = b[k]; });
+  return out;
+}
+
+/** Questions of A, then those only variant B has (for columns and results). */
+function allQuestions_(form) {
+  var seen = {};
+  var out = [];
+  var b = (form.variants && form.variants.B && form.variants.B.questions) || [];
+  (form.questions || []).concat(b).forEach(function (q) { if (!seen[q.id]) { seen[q.id] = true; out.push(q); } });
+  return out;
+}
+
+/** "x_id:B" when the tag matches this form's experiment, else ''. */
+function variantTag_(form, tag) {
+  var parts = String(tag || '').split(':');
+  var x = form.experiment;
+  if (!x || x.id !== parts[0] || !(form.variants && form.variants.B) || (parts[1] !== 'A' && parts[1] !== 'B')) return '';
+  return x.id + ':' + parts[1];
+}
+
+function dims_(form, x) {
+  x = x || {};
+  var device = ['mobile', 'desktop', 'tablet'].indexOf(x.device) === -1 ? '' : x.device;
+  var source = String(x.source || '').trim().toLowerCase().replace(/[^\wÀ-ɏ ().-]+/g, '-').slice(0, 40);
+  return { device: device, source: source, variant: variantTag_(form, x.variant) };
 }
 
 // ─── Registry ───────────────────────────────────────────────────────────────
@@ -202,11 +248,13 @@ function saveForm_(form) {
       resp.getRange(1, 1, 1, 2).setValues([['Submitted At', 'Response ID']]).setFontWeight('bold');
       resp.setFrozenRows(1);
       var ev = ss.insertSheet('Events');
-      ev.appendRow(['Timestamp', 'Session ID', 'Type', 'Path']);
+      ev.appendRow(EVENT_HEADERS);
       ev.setFrozenRows(1);
       sheetId = ss.getId();
     } else {
       ss = SpreadsheetApp.openById(sheetId);
+      // Sheets made before per-device / per-source / A/B reports get the new columns.
+      ss.getSheetByName('Events').getRange(1, 1, 1, EVENT_HEADERS.length).setValues([EVENT_HEADERS]);
     }
     ensureColumns_(ss.getSheetByName('Responses'), form);
     shareSheet_(ss, form);
@@ -242,10 +290,14 @@ function moveToFolder_(fileId) {
   try { DriveApp.getFileById(fileId).moveTo(DriveApp.getFolderById(folderId)); } catch (e) { /* keep in root */ }
 }
 
-function shareSheet_(ss, form) {
-  var emails = String((form.integrations && form.integrations.sheetEditors) || '')
+function sheetEditors_(form) {
+  return String((form.integrations && form.integrations.sheetEditors) || '')
     .split(',').map(function (s) { return s.trim().toLowerCase(); })
     .filter(function (s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); });
+}
+
+function shareSheet_(ss, form) {
+  var emails = sheetEditors_(form);
   if (!emails.length) return;
   var existing = ss.getEditors().map(function (u) { return u.getEmail().toLowerCase(); });
   var add = emails.filter(function (m) { return existing.indexOf(m) === -1; });
@@ -255,7 +307,9 @@ function shareSheet_(ss, form) {
 // ─── Responses sheet columns ────────────────────────────────────────────────
 // Each header cell carries a note "q:<id>", "h:<key>" or "m:<key>" so columns
 // survive question renames and reordering in the builder.
-var META_COLS = [['durationSec', 'Durasi (detik)'], ['pageUrl', 'Page URL'], ['referrer', 'Referrer'], ['sessionId', 'Session ID']];
+var META_COLS = [['durationSec', 'Durasi (detik)'], ['pageUrl', 'Page URL'], ['referrer', 'Referrer'], ['sessionId', 'Session ID'],
+  ['device', 'Perangkat'], ['source', 'Sumber'], ['variant', 'Varian A/B']];
+var EVENT_HEADERS = ['Timestamp', 'Session ID', 'Type', 'Path', 'Device', 'Source', 'Variant'];
 var AUTO_HIDDEN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
 
 function columnMap_(sh) {
@@ -269,7 +323,7 @@ function columnMap_(sh) {
 function ensureColumns_(sh, form) {
   var cm = columnMap_(sh);
   var wanted = [];
-  (form.questions || []).forEach(function (q) { if (q.type !== 'statement') wanted.push(['q:' + q.id, plainTitle_(q.title) || q.id]); });
+  allQuestions_(form).forEach(function (q) { if (q.type !== 'statement') wanted.push(['q:' + q.id, plainTitle_(q.title) || q.id]); });
   AUTO_HIDDEN.concat(form.hiddenFields || []).forEach(function (h) {
     if (wanted.every(function (w) { return w[0] !== 'h:' + h; })) wanted.push(['h:' + h, h]);
   });
@@ -291,40 +345,56 @@ function submit_(body) {
   var responseId = 'r_' + Utilities.getUuid().slice(0, 12);
   if (body.hp) return { ok: true, responseId: responseId }; // honeypot hit: pretend success
 
-  var answers = body.answers || {};
   var hidden = body.hidden || {};
   var meta = body.meta || {};
+  var d = dims_(form, meta);
+  meta.device = d.device; meta.source = d.source; meta.variant = d.variant;
+  var shown = variantForm_(form, d.variant.split(':')[1]);
   var now = new Date();
 
   var ss = SpreadsheetApp.openById(rec.sheetId);
+  // Only the questions this visitor was shown; file answers must be this visit's own uploads.
+  var answers = {};
+  var fileIds = [];
+  (shown.questions || []).forEach(function (q) {
+    var v = (body.answers || {})[q.id];
+    if (v === undefined || q.type === 'statement') return;
+    if (q.type === 'file_upload') {
+      var files = checkUploads_(ss, q, String(meta.sessionId || ''), v);
+      files.forEach(function (f) { fileIds.push(f.ref.slice(6)); });
+      answers[q.id] = files;
+    } else {
+      answers[q.id] = v;
+    }
+  });
   var sh = ss.getSheetByName('Responses');
 
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     var cm = columnMap_(sh);
-    var needsColumns = (form.questions || []).some(function (q) { return q.type !== 'statement' && !cm.map['q:' + q.id]; });
+    var needsColumns = allQuestions_(form).some(function (q) { return q.type !== 'statement' && !cm.map['q:' + q.id]; })
+      || META_COLS.some(function (m) { return !cm.map['m:' + m[0]]; });
     var map = needsColumns ? ensureColumns_(sh, form) : cm.map;
     var width = Math.max(sh.getLastColumn(), 2);
     var row = new Array(width);
     for (var i = 0; i < width; i++) row[i] = '';
     row[0] = now;
     row[1] = responseId;
-    var validIds = {};
-    (form.questions || []).forEach(function (q) { validIds[q.id] = true; });
-    Object.keys(answers).forEach(function (k) { if (validIds[k] && map['q:' + k]) row[map['q:' + k] - 1] = cell_(answers[k]); });
+    Object.keys(answers).forEach(function (k) { if (map['q:' + k]) row[map['q:' + k] - 1] = cell_(answerText_(answers[k])); });
     Object.keys(hidden).forEach(function (k) { if (map['h:' + k]) row[map['h:' + k] - 1] = cell_(hidden[k]); });
     META_COLS.forEach(function (m) { if (map['m:' + m[0]]) row[map['m:' + m[0]] - 1] = cell_(meta[m[0]]); });
     sh.appendRow(row);
   } finally {
     lock.releaseLock();
   }
-  ss.getSheetByName('Events').appendRow([now, cell_(meta.sessionId), 'complete', cell_((meta.path || []).join(','))]);
+  ss.getSheetByName('Events').appendRow([now, cell_(meta.sessionId), 'complete', cell_((meta.path || []).join(',')), d.device, cell_(d.source), d.variant]);
+  if (fileIds.length) markUploads_(ss, fileIds, responseId);
   // The finished response replaces its unfinished copy.
   try { deletePartial_(ss, String(meta.sessionId || '')); } catch (err) { console.error(err); }
 
   // Side effects never fail the submission.
-  try { sideEffects_(form, responseId, now, answers, hidden, meta); } catch (err) { console.error(err); }
+  try { sideEffects_(shown, responseId, now, answers, hidden, meta); } catch (err) { console.error(err); }
   return { ok: true, responseId: responseId };
 }
 
@@ -351,7 +421,7 @@ function sideEffects_(form, responseId, now, answers, hidden, meta) {
 
   if (ig.notifyEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ig.notifyEmail) && MailApp.getRemainingDailyQuota() > 0) {
     var lines = (form.questions || []).filter(function (q) { return answers[q.id] !== undefined; })
-      .map(function (q) { var v = answers[q.id]; return '• ' + plainTitle_(q.title) + '\n  ' + (v && v.join ? v.join(', ') : v); });
+      .map(function (q) { return '• ' + plainTitle_(q.title) + '\n  ' + answerText_(answers[q.id]); });
     MailApp.sendEmail(ig.notifyEmail, 'Jawaban baru: ' + form.title, lines.join('\n\n') + '\n\nResponse ID: ' + responseId);
   }
 }
@@ -381,7 +451,7 @@ function capiRequest_(form, token, now, answers, hidden, meta) {
       action_source: 'website',
       event_source_url: String(meta.pageUrl || '').slice(0, 1000),
       user_data: user,
-      custom_data: { form_id: form.id, form_title: form.title, utm_source: hidden.utm_source || '', utm_campaign: hidden.utm_campaign || '' },
+      custom_data: { form_id: form.id, form_title: form.title, utm_source: hidden.utm_source || '', utm_campaign: hidden.utm_campaign || '', ab_variant: meta.variant || undefined },
     }],
   };
   var test = prop_('FB_TEST_EVENT_CODE');
@@ -399,10 +469,11 @@ function logEvent_(body) {
   if (['view', 'start', 'abandon', 'partial'].indexOf(type) === -1) throw new Error('Event tidak valid.');
   var rec = getRecordCached_(body.formId);
   var path = (body.path || []).slice(0, 200).map(String).join(',');
+  var d = dims_(rec.form, body);
   var ss = SpreadsheetApp.openById(rec.sheetId);
   // appendRow is a single write; no lock needed for this append-only log.
-  ss.getSheetByName('Events').appendRow([new Date(), cell_(String(body.sessionId || '').slice(0, 40)), type, cell_(path)]);
-  if (type === 'abandon' || type === 'partial') upsertPartial_(ss, rec.form, body);
+  ss.getSheetByName('Events').appendRow([new Date(), cell_(String(body.sessionId || '').slice(0, 40)), type, cell_(path), d.device, cell_(d.source), d.variant]);
+  if (type === 'abandon' || type === 'partial') upsertPartial_(ss, variantForm_(rec.form, d.variant.split(':')[1]), body);
   return { ok: true };
 }
 
@@ -447,7 +518,7 @@ function cleanPartialAnswers_(form, answers) {
   var out = {};
   (form.questions || []).forEach(function (q) {
     var v = answers[q.id];
-    if (q.type === 'statement' || v === undefined || v === null || v === '') return;
+    if (q.type === 'statement' || q.type === 'file_upload' || v === undefined || v === null || v === '') return;
     if (Object.prototype.toString.call(v) === '[object Array]') out[q.id] = v.slice(0, 50).map(function (x) { return String(x).slice(0, 500); });
     else out[q.id] = typeof v === 'number' ? v : String(v).slice(0, 2000);
   });
@@ -504,6 +575,167 @@ function readPartials_(ss) {
     .slice(0, 500);
 }
 
+// ─── File uploads (Google Drive) ────────────────────────────────────────────
+var FILE_TYPES = {
+  image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'],
+  pdf: ['application/pdf'],
+  document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/csv', 'text/plain'],
+};
+FILE_TYPES.any = FILE_TYPES.image.concat(FILE_TYPES.document);
+var OOXML = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
+var OLE = { doc: 'application/msword', xls: 'application/vnd.ms-excel', ppt: 'application/vnd.ms-powerpoint' };
+var UPLOAD_HEADERS = ['Uploaded At', 'File ID', 'Session ID', 'Question ID', 'Name', 'Type', 'Size', 'Response ID'];
+
+/** Same content sniffing as worker/src/files.js: the first bytes decide the type, never the name. */
+function detectType_(bytes, name) {
+  var b = bytes.map(function (x) { return x & 0xff; });
+  var ext = ((String(name).toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1]) || '';
+  var str = function (from, to) { return String.fromCharCode.apply(null, b.slice(from, to)); };
+  var starts = function (sig) { return sig.every(function (x, i) { return b[i] === x; }); };
+  if (b.length < 4) return null;
+  if (starts([0xFF, 0xD8, 0xFF])) return 'image/jpeg';
+  if (starts([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) return 'image/png';
+  if (/^GIF8[79]a$/.test(str(0, 6))) return 'image/gif';
+  if (str(0, 4) === 'RIFF' && str(8, 12) === 'WEBP') return 'image/webp';
+  if (str(4, 8) === 'ftyp') {
+    if (/^(heic|heix|hevc|hevx|heim|heis)$/.test(str(8, 12))) return 'image/heic';
+    if (/^(mif1|msf1|heif)$/.test(str(8, 12))) return 'image/heif';
+  }
+  if (str(0, 5) === '%PDF-') return 'application/pdf';
+  if (starts([0x50, 0x4B, 0x03, 0x04])) return OOXML[ext] || null;
+  if (starts([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])) return OLE[ext] || null;
+  if ((ext === 'csv' || ext === 'txt') && b.indexOf(0) === -1) return ext === 'csv' ? 'text/csv' : 'text/plain';
+  return null;
+}
+
+function cleanFileName_(raw) {
+  var s = String(raw || '').split(/[\\/]/).pop().replace(/[\u0000-\u001f\u007f"<>|:*?]/g, '').replace(/\s+/g, ' ').trim();
+  return (s || 'file').slice(0, 120);
+}
+
+function folder_(name, parentId) {
+  var parent = parentId ? DriveApp.getFolderById(parentId) : DriveApp.getRootFolder();
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+/** Private folder per form, shared (view) with the form's sheet editors. */
+function uploadsFolder_(form) {
+  var root = folder_('FormFlow Uploads', prop_('DRIVE_FOLDER_ID'));
+  var f = folder_((form.title || form.id).slice(0, 80) + ' (' + form.id + ')', root.getId());
+  var emails = sheetEditors_(form);
+  if (emails.length) {
+    var have = f.getViewers().concat(f.getEditors()).map(function (u) { return u.getEmail().toLowerCase(); });
+    var add = emails.filter(function (m) { return have.indexOf(m) === -1; });
+    if (add.length) f.addViewers(add);
+  }
+  return f;
+}
+
+function uploadsSheet_(ss) {
+  var sh = ss.getSheetByName('Uploads');
+  if (!sh) {
+    sh = ss.insertSheet('Uploads');
+    sh.appendRow(UPLOAD_HEADERS);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Respondent upload: public, checked against the question's rules and the file's content. */
+function upload_(body) {
+  var rec = getRecordCached_(body.formId);
+  var form = rec.form;
+  var sessionId = String(body.sessionId || '');
+  if (!/^s_[a-z0-9]+$/.test(sessionId) || sessionId.length > 40) throw new Error('Session tidak valid.');
+  var q = allQuestions_(form).filter(function (x) { return x.id === body.questionId; })[0];
+  if (!q || q.type !== 'file_upload') throw new Error('Pertanyaan ini tidak menerima file.');
+  var s = q.settings || {};
+  var kind = FILE_TYPES[s.fileKind] ? s.fileKind : 'any';
+  var maxBytes = Math.min(MAX_UPLOAD_BYTES, Math.max(1, Number(s.maxSizeMb) || 10) * 1024 * 1024);
+  var maxFiles = Math.min(10, Math.max(1, Math.round(Number(s.maxFiles) || 1)));
+  var name = cleanFileName_(body.name);
+  var bytes = Utilities.base64Decode(String(body.data || ''));
+  if (!bytes.length) throw new Error('File kosong.');
+  if (bytes.length > maxBytes) throw new Error(name + ': lebih dari ' + Math.round(maxBytes / 1024 / 1024) + ' MB.');
+  var type = detectType_(bytes, name);
+  if (!type || FILE_TYPES[kind].indexOf(type) === -1) throw new Error(name + ': jenis file tidak diterima.');
+  // Replacing a file is fine; hundreds of uploads from one visit are not.
+  var cache = CacheService.getScriptCache();
+  var countKey = 'up_' + form.id + '_' + sessionId + '_' + q.id;
+  var used = Number(cache.get(countKey) || 0);
+  if (used >= maxFiles * 3) throw new Error('Terlalu banyak file untuk pertanyaan ini.');
+  cache.put(countKey, String(used + 1), 21600);
+
+  var file = uploadsFolder_(form).createFile(Utilities.newBlob(bytes, type, name));
+  var ss = SpreadsheetApp.openById(rec.sheetId);
+  uploadsSheet_(ss).appendRow([new Date(), file.getId(), sessionId, q.id, cell_(name), type, bytes.length, '']);
+  return { ok: true, file: { ref: 'drive:' + file.getId(), name: name, type: type, size: bytes.length, url: file.getUrl() } };
+}
+
+/** The file answers of a submission, as recorded by upload_() for this session and question. */
+function checkUploads_(ss, q, sessionId, list) {
+  if (Object.prototype.toString.call(list) !== '[object Array]' || !list.length) throw new Error((q.title || q.id) + ': file tidak valid.');
+  var sh = ss.getSheetByName('Uploads');
+  var rows = sh && sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, UPLOAD_HEADERS.length).getValues() : [];
+  return list.map(function (f) {
+    var id = String((f && f.ref) || '').replace(/^drive:/, '');
+    var row = rows.filter(function (r) { return r[1] === id && r[2] === sessionId && r[3] === q.id; })[0];
+    if (!row) throw new Error((q.title || q.id) + ': file tidak ditemukan. Unggah ulang.');
+    return { ref: 'drive:' + id, name: uncell_(row[4]), type: row[5], size: row[6], url: 'https://drive.google.com/file/d/' + id + '/view' };
+  });
+}
+
+function markUploads_(ss, fileIds, responseId) {
+  var sh = ss.getSheetByName('Uploads');
+  if (!sh || sh.getLastRow() < 2) return;
+  var ids = sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues();
+  ids.forEach(function (r, i) { if (fileIds.indexOf(r[0]) !== -1) sh.getRange(i + 2, 8).setValue(responseId); });
+}
+
+/** "a.pdf (url), b.png (url)" for sheets, email and CSV. */
+function answerText_(v) {
+  if (Object.prototype.toString.call(v) !== '[object Array]') return v;
+  return v.map(function (x) { return x && typeof x === 'object' ? (x.url ? x.name + ' (' + x.url + ')' : x.name) : String(x); }).join(', ');
+}
+
+/** Reverse of answerText_() for file cells, so the dashboard shows file chips. */
+function parseFileText_(text) {
+  var out = [];
+  String(text).replace(/(.+?) \((https:\/\/drive\.google\.com\/file\/d\/([\w-]+)\/view)\)(?:, |$)/g, function (_, name, url, id) {
+    out.push({ ref: 'drive:' + id, name: name, url: url });
+    return '';
+  });
+  return out.length ? out : text;
+}
+
+/** Builder image: stored in Drive and shared by link, because respondents must see it. */
+function media_(body) {
+  var name = cleanFileName_(body.name);
+  var bytes = Utilities.base64Decode(String(body.data || ''));
+  if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error('Gambar maksimal 5 MB.');
+  var type = detectType_(bytes, name);
+  if (['image/jpeg', 'image/png', 'image/gif', 'image/webp'].indexOf(type) === -1) throw new Error('Gambar harus JPG, PNG, GIF, atau WebP.');
+  var file = folder_('FormFlow Media', prop_('DRIVE_FOLDER_ID')).createFile(Utilities.newBlob(bytes, type, name));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { ok: true, url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w2000' };
+}
+
+/** Files from visits that never submitted, older than a day, go to the Drive trash. */
+function prunePendingUploads_(ss) {
+  var sh = ss.getSheetByName('Uploads');
+  if (!sh || sh.getLastRow() < 2) return;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, UPLOAD_HEADERS.length).getValues();
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (!rows[i][7] && new Date(rows[i][0]).getTime() < Date.now() - 86400000) {
+      try { DriveApp.getFileById(rows[i][1]).setTrashed(true); } catch (e) { /* already gone */ }
+      sh.deleteRow(i + 2);
+    }
+  }
+}
+
 // ─── Dashboard data ─────────────────────────────────────────────────────────
 function getResults_(formId, days) {
   var rec = getFormRecord_(formId);
@@ -516,6 +748,8 @@ function getResults_(formId, days) {
     var cm = columnMap_(sh);
     var rows = sh.getRange(2, 1, sh.getLastRow() - 1, cm.width).getValues();
     var keys = Object.keys(cm.map);
+    var fileQ = {};
+    allQuestions_(rec.form).forEach(function (q) { if (q.type === 'file_upload') fileQ[q.id] = true; });
     rows.forEach(function (r) {
       var ts = r[0] instanceof Date ? r[0] : new Date(r[0]);
       if (isNaN(ts) || ts.getTime() < since) return;
@@ -524,7 +758,7 @@ function getResults_(formId, days) {
         var v = uncell_(r[cm.map[k] - 1]);
         if (v === '' || v === null) return;
         var kind = k.slice(0, 1); var id = k.slice(2);
-        if (kind === 'q') out.answers[id] = v;
+        if (kind === 'q') out.answers[id] = fileQ[id] ? parseFileText_(String(v)) : v;
         else if (kind === 'h') out.hidden[id] = v;
         else if (kind === 'm') out.meta[id] = v;
       });
@@ -535,19 +769,22 @@ function getResults_(formId, days) {
   var ev = ss.getSheetByName('Events');
   var events = [];
   if (ev.getLastRow() > 1) {
-    ev.getRange(2, 1, ev.getLastRow() - 1, 4).getValues().forEach(function (r) {
+    ev.getRange(2, 1, ev.getLastRow() - 1, EVENT_HEADERS.length).getValues().forEach(function (r) {
       var ts = r[0] instanceof Date ? r[0] : new Date(r[0]);
       if (isNaN(ts) || ts.getTime() < since) return;
-      events.push({ ts: ts.toISOString(), sessionId: uncell_(r[1]), type: r[2], path: String(uncell_(r[3]) || '').split(',').filter(String) });
+      events.push({
+        ts: ts.toISOString(), sessionId: uncell_(r[1]), type: r[2], path: String(uncell_(r[3]) || '').split(',').filter(String),
+        device: r[4] || '', source: uncell_(r[5]) || '', variant: r[6] || '',
+      });
     });
   }
   return { ok: true, responses: responses, events: events, partials: readPartials_(ss), sheetUrl: ss.getUrl() };
 }
 
 /**
- * Optional maintenance, attach to a monthly time trigger: deletes Events rows
- * older than ~13 months and "Belum selesai" rows older than 30 days.
- * Responses are never touched.
+ * Maintenance, attach to a daily time trigger: deletes Events rows older than
+ * ~13 months, "Belum selesai" rows older than 30 days, and files uploaded
+ * during visits that never submitted (after a day). Responses are never touched.
  */
 function pruneOldEvents() {
   var keepDays = 400;
@@ -561,6 +798,7 @@ function pruneOldEvents() {
     var old = 0;
     while (old < n && new Date(ts[old][0]).getTime() < cutoff) old++;
     if (old > 0) ev.deleteRows(2, old);
+    prunePendingUploads_(SpreadsheetApp.openById(rec.sheetId));
     // Unfinished responses are kept for 30 days at most (data minimisation).
     var ps = SpreadsheetApp.openById(rec.sheetId).getSheetByName('Belum selesai');
     if (!ps || ps.getLastRow() < 2) return;

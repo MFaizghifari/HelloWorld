@@ -3,7 +3,7 @@
 // to what respondents see.
 import { el } from './dom.js';
 import { icon } from './icons.js';
-import { interpolate, plainTitle, scaleRange } from './logic.js';
+import { interpolate, plainTitle, scaleRange, fileRules, isFileList, formatBytes, FILE_KINDS } from './logic.js';
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
 export const FONTS = {
@@ -29,6 +29,22 @@ export const THEME_PRESETS = [
 ];
 
 const HEX = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Image URLs allowed in a form: https, images uploaded to this site (same
+ * origin, e.g. /m/… from the Worker), and inline data URLs of raster images
+ * (uploads in local/demo mode). Anything else renders no image.
+ */
+export function safeImageUrl(u) {
+  const s = String(u || '').trim();
+  if (/^https:\/\//i.test(s)) return s;
+  if (/^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(s)) return s;
+  try {
+    const x = new URL(s, location.href);
+    if (x.origin === location.origin && /^https?:$/.test(x.protocol)) return x.href;
+  } catch { /* not a URL */ }
+  return '';
+}
 
 /** Fills defaults and migrates the v1 theme shape ({primary, background, text}). */
 export function normalizeTheme(t = {}) {
@@ -71,8 +87,9 @@ export function applyTheme(root, theme) {
   // Brightness: negative darkens the background image, positive lightens it.
   const b = t.brightness / 100;
   s.setProperty('--ff-overlay', b < 0 ? `rgba(0,0,0,${-b})` : `rgba(255,255,255,${b})`);
-  if (t.backgroundImage && /^https:\/\//.test(t.backgroundImage)) {
-    s.setProperty('--ff-bg-image', `url("${t.backgroundImage.replace(/["\\]/g, '')}")`);
+  const bg = safeImageUrl(t.backgroundImage);
+  if (bg) {
+    s.setProperty('--ff-bg-image', `url("${bg.replace(/["\\]/g, '')}")`);
     root.classList.add('ff-has-image');
   } else {
     s.removeProperty('--ff-bg-image');
@@ -84,9 +101,9 @@ export function applyTheme(root, theme) {
 
 /** The form owner's logo (theme.logoUrl), pinned to the top-left like Typeform. */
 export function brandLogo(theme = {}) {
-  const url = theme.logoUrl;
-  if (!url || !/^https:\/\//.test(url)) return null;
-  return el('img', { class: 'ff-logo', src: url.replace(/["\\]/g, ''), alt: '' });
+  const url = safeImageUrl(theme.logoUrl);
+  if (!url) return null;
+  return el('img', { class: 'ff-logo', src: url, alt: '' });
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -506,6 +523,107 @@ function scaleInput(q, ctx) {
   };
 }
 
+// Thumbnails of files picked on this page, by upload ref (kept when going back to the question).
+const filePreviews = new Map();
+
+function fileBadge(f) {
+  const ext = (String(f.name).match(/\.([a-z0-9]{1,4})$/i) || [])[1];
+  return el('span', { class: 'ff-file-icon', 'aria-hidden': 'true' }, icon('file', { size: 18 }), ext ? el('span', { text: ext.toUpperCase() }) : null);
+}
+
+/** Typeform-style upload: a drop zone, then one row per file with progress and a remove button. */
+function fileInput(q, ctx) {
+  const rules = fileRules(q);
+  const edit = ctx.mode === 'edit';
+  let files = isFileList(ctx.value) ? [...ctx.value] : [];
+  let uploading = 0;
+  const list = el('ul', { class: 'ff-files', 'aria-live': 'polite' });
+  const picker = el('input', { type: 'file', accept: rules.accept, multiple: rules.maxFiles > 1 ? true : undefined, hidden: true, tabindex: -1 });
+  const limits = `${FILE_KINDS[rules.kind].hint} · maks. ${rules.maxMb} MB${rules.maxFiles > 1 ? ` · sampai ${rules.maxFiles} file` : ''}`;
+  const action = el('strong', { text: 'Pilih file' });
+  const zone = el(edit ? 'div' : 'button', { type: edit ? undefined : 'button', class: 'ff-drop', 'aria-label': `Pilih file. ${limits}` },
+    el('span', { class: 'ff-drop-icon' }, icon('upload', { size: 24 })),
+    el('span', { class: 'ff-drop-title' }, action, el('span', { class: 'ff-drop-or', text: ' atau seret ke sini' })),
+    el('span', { class: 'ff-drop-hint', text: limits }));
+
+  const row = (meta, file) => {
+    const preview = file && /^image\/(jpeg|png|gif|webp)$/.test(file.type) ? URL.createObjectURL(file) : filePreviews.get(meta?.ref);
+    const status = el('span', { class: 'ff-file-meta', text: meta ? formatBytes(meta.size) : 'Mengunggah…' });
+    const bar = el('span', { class: 'ff-file-bar' }, el('i'));
+    const remove = el('button', { type: 'button', class: 'ff-file-del', 'aria-label': `Hapus ${meta?.name || file.name}` }, icon('close', { size: 14 }));
+    const li = el('li', { class: `ff-file${meta ? '' : ' is-uploading'}` },
+      preview ? el('img', { class: 'ff-file-thumb', src: preview, alt: '' }) : fileBadge(meta || file),
+      el('span', { class: 'ff-file-text' }, el('span', { class: 'ff-file-name', text: meta?.name || file.name }), status, meta ? null : bar),
+      remove);
+    return {
+      el: li, remove, preview,
+      progress: (p) => { bar.firstChild.style.width = `${Math.round(p * 100)}%`; },
+      done: (m) => { li.classList.remove('is-uploading'); status.textContent = `${formatBytes(m.size)} · terunggah`; bar.remove(); li.setAttribute('aria-label', `${m.name} terunggah`); },
+      fail: (msg) => { li.classList.remove('is-uploading'); li.classList.add('is-error'); status.textContent = msg; bar.remove(); },
+    };
+  };
+
+  const bindRemove = (r, getMeta) => r.remove.addEventListener('click', () => {
+    const meta = getMeta();
+    if (meta) files = files.filter((f) => f.ref !== meta.ref);
+    r.el.remove();
+    refresh();
+  });
+
+  const refresh = () => {
+    const n = files.length + uploading;
+    zone.hidden = n >= rules.maxFiles && rules.maxFiles > 1;
+    zone.classList.toggle('ff-drop-compact', n > 0);
+    action.textContent = !n ? 'Pilih file' : rules.maxFiles === 1 ? 'Ganti file' : 'Tambah file';
+  };
+
+  async function add(picked) {
+    ctx.api?.clearError();
+    for (const file of picked) {
+      if (rules.maxFiles === 1 && files.length) { files = []; list.replaceChildren(); }
+      if (files.length + uploading >= rules.maxFiles) { ctx.api?.showError(`Maksimal ${rules.maxFiles} file.`); break; }
+      const r = row(null, file);
+      let meta = null;
+      bindRemove(r, () => meta);
+      list.append(r.el);
+      uploading++;
+      refresh();
+      try {
+        meta = await ctx.upload(file, r.progress);
+        if (!r.el.isConnected) continue; // removed while uploading
+        files.push(meta);
+        if (r.preview) filePreviews.set(meta.ref, r.preview);
+        r.done(meta);
+      } catch (err) {
+        r.fail(err.message);
+      } finally {
+        uploading--;
+        refresh();
+      }
+    }
+    // Uploaded: Enter now continues, like on every other question.
+    if (!uploading && files.length && document.activeElement === zone) zone.blur();
+  }
+
+  if (!edit) {
+    for (const meta of files) { const r = row(meta); r.done(meta); bindRemove(r, () => meta); list.append(r.el); }
+    zone.addEventListener('click', () => picker.click());
+    picker.addEventListener('change', () => { add([...picker.files]); picker.value = ''; });
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('is-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('is-over'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('is-over'); add([...e.dataTransfer.files]); });
+    refresh();
+  }
+  return {
+    el: el('div', { class: 'ff-upload' }, zone, list, picker),
+    focus: () => {}, // Enter = OK; keyboard users Tab to the drop zone to pick a file
+    getValue: () => (files.length ? [...files] : ''),
+    pending: () => uploading > 0,
+    // Enter on the drop zone opens the file picker instead of submitting.
+    onKey: (e) => e.key === 'Enter' && document.activeElement === zone,
+  };
+}
+
 function buildInput(q, ctx) {
   switch (q.type) {
     case 'short_text': case 'email': case 'number': return textInput(q, ctx, q.type);
@@ -515,6 +633,7 @@ function buildInput(q, ctx) {
     case 'multiple_choice': case 'yes_no': return choiceInput(q, ctx);
     case 'dropdown': return dropdownInput(q, ctx);
     case 'rating': case 'opinion_scale': return scaleInput(q, ctx);
+    case 'file_upload': return fileInput(q, ctx);
     default: return { el: null, getValue: () => undefined, focus: () => {} };
   }
 }
@@ -533,7 +652,7 @@ export function welcomeScreen(form, ctx) {
   const btnLabel = w.buttonText || 'Mulai';
   return {
     el: el('section', { class: 'ff-screen ff-welcome' },
-      w.imageUrl && /^https:\/\//.test(w.imageUrl) ? el('img', { class: 'ff-welcome-img', src: w.imageUrl, alt: '' }) : null,
+      safeImageUrl(w.imageUrl) ? el('img', { class: 'ff-welcome-img', src: safeImageUrl(w.imageUrl), alt: '' }) : null,
       text(ctx, w.title || form.title, { tag: 'h1', className: 'ff-title ff-title-xl', placeholder: 'Judul halaman pembuka', onChange: set('title') }),
       text(ctx, w.description, { tag: 'p', className: 'ff-desc', placeholder: 'Deskripsi (opsional)', multiline: true, onChange: set('description') }),
       el('div', { class: 'ff-actions' },
@@ -575,7 +694,8 @@ export function questionScreen(form, q, ctx) {
   const edit = ctx.mode === 'edit';
   const s = q.settings || {};
   const errorBox = el('div', { class: 'ff-error', role: 'alert', hidden: true });
-  const layout = q.imageUrl && /^https:\/\//.test(q.imageUrl) ? (q.layout || 'stack') : 'none';
+  const image = safeImageUrl(q.imageUrl);
+  const layout = image ? (q.layout || 'stack') : 'none';
   let input;
   const api = {
     showError(msg) {
@@ -585,7 +705,12 @@ export function questionScreen(form, q, ctx) {
     },
     clearError() { errorBox.hidden = true; },
   };
-  ctx.submit = (v) => { if (!edit) ctx.onSubmit(v !== undefined ? v : input.getValue(), api); };
+  ctx.submit = (v) => {
+    if (edit) return;
+    if (input.pending?.()) { api.showError('Tunggu sampai file selesai diunggah.'); return; }
+    ctx.onSubmit(v !== undefined ? v : input.getValue(), api);
+  };
+  ctx.api = api;
   input = q.type === 'statement' ? { el: null, getValue: () => undefined, focus: () => {} } : buildInput(q, ctx);
 
   const num = q.type === 'statement'
@@ -609,7 +734,7 @@ export function questionScreen(form, q, ctx) {
         q.required && q.type !== 'statement' ? el('span', { class: 'ff-req', text: '*' }) : null)),
     edit ? el('div', { class: 'ff-edit-hint' }, 'Ketik ', el('kbd', { text: '@' }), ' untuk menyisipkan jawaban sebelumnya') : null,
     text(ctx, q.description, { tag: 'p', className: 'ff-desc', placeholder: 'Deskripsi (opsional)', multiline: true, onChange: (v) => { q.description = v; ctx.onEdit(); } }),
-    layout === 'stack' ? el('img', { class: 'ff-q-img', src: q.imageUrl, alt: '' }) : null,
+    layout === 'stack' ? el('img', { class: 'ff-q-img', src: image, alt: '' }) : null,
     input.el ? el('div', { class: 'ff-input' }, input.el) : null,
     // Shown when the form keeps unfinished answers (UU PDP: say why contact data is kept).
     ctx.consent && (q.type === 'email' || q.type === 'phone')
@@ -619,7 +744,7 @@ export function questionScreen(form, q, ctx) {
     actions);
 
   const screen = el('section', { class: `ff-screen ff-question ff-layout-${layout}`, 'data-type': q.type },
-    layout === 'split-left' || layout === 'split-right' ? el('div', { class: 'ff-media', style: `background-image:url("${q.imageUrl.replace(/["\\]/g, '')}")` }) : null,
+    layout === 'split-left' || layout === 'split-right' ? el('div', { class: 'ff-media', style: `background-image:url("${image.replace(/["\\]/g, '')}")` }) : null,
     content);
   return {
     el: screen,

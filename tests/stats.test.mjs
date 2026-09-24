@@ -15,10 +15,10 @@ const ts = '2026-09-23T10:00:00Z';
 
 test('funnel, completion and NPS', () => {
   const events = [
-    { ts, sessionId: 's1', type: 'view', path: [] },
-    { ts, sessionId: 's2', type: 'view', path: [] },
-    { ts, sessionId: 's3', type: 'view', path: [] },
-    { ts, sessionId: 's4', type: 'view', path: [] },
+    { ts, sessionId: 's1', type: 'view', path: [], device: 'mobile', source: 'facebook' },
+    { ts, sessionId: 's2', type: 'view', path: [], device: 'mobile', source: 'instagram' },
+    { ts, sessionId: 's3', type: 'view', path: [], device: 'desktop', source: 'facebook' },
+    { ts, sessionId: 's4', type: 'view', path: [], device: 'desktop', source: '(langsung)' },
     { ts, sessionId: 's1', type: 'start', path: ['a'] },
     { ts, sessionId: 's1', type: 'complete', path: ['a', 'b', 'c'] },
     { ts, sessionId: 's2', type: 'start', path: ['a'] },
@@ -26,8 +26,9 @@ test('funnel, completion and NPS', () => {
     { ts, sessionId: 's3', type: 'abandon', path: ['a'] },
   ];
   const responses = [
-    { submittedAt: ts, answers: { a: 'Faiz', b: 'X, Y, Z', c: 10 }, hidden: { utm_source: 'fb' } },
-    { submittedAt: ts, answers: { a: 'Ana', b: 'Z', c: 3 }, hidden: {} },
+    { submittedAt: ts, answers: { a: 'Faiz', b: 'X, Y, Z', c: 10 }, hidden: { utm_source: 'fb' }, meta: { sessionId: 's1' } },
+    // No events for this session (blocked tracker): counted under the segments in its meta.
+    { submittedAt: ts, answers: { a: 'Ana', b: 'Z', c: 3 }, hidden: {}, meta: { sessionId: 's9', device: 'tablet', source: 'tiktok' } },
   ];
   const s = computeStats(form, responses, events, { days: 7, today });
   assert.equal(s.views, 4);
@@ -43,7 +44,13 @@ test('funnel, completion and NPS', () => {
   assert.deepEqual(b.counts, { 'X, Y': 1, Z: 2 });
   const c = s.perQuestion.find((q) => q.id === 'c');
   assert.equal(c.nps, 0); // 1 promoter, 1 detractor
-  assert.deepEqual(s.sources, { fb: 1, '(direct)': 1 });
+  assert.deepEqual(s.segments.device, {
+    mobile: { views: 2, starts: 2, completions: 1 },
+    desktop: { views: 2, starts: 1, completions: 0 },
+    tablet: { views: 0, starts: 0, completions: 1 },
+  });
+  assert.deepEqual(s.segments.source.facebook, { views: 2, starts: 2, completions: 1 });
+  assert.deepEqual(s.segments.variant, {});
   assert.equal(s.daily.length, 7);
   assert.equal(s.daily.at(-2).completions, 2);
 });

@@ -42,8 +42,44 @@ function fakeSheet(name) {
   return sheet;
 }
 
+// Google Drive: folders, files, sharing (enough for uploads and media).
+function fakeDrive() {
+  const files = {};
+  const folders = {};
+  let n = 0;
+  const makeFolder = (name) => {
+    const id = `fold${++n}`;
+    const f = {
+      name, viewers: [], children: [],
+      getId: () => id,
+      getFoldersByName: (nm) => { const hit = f.children.filter((c) => c.name === nm); let i = 0; return { hasNext: () => i < hit.length, next: () => hit[i++] }; },
+      createFolder: (nm) => { const c = makeFolder(nm); f.children.push(c); return c; },
+      createFile: (blob) => {
+        const fid = `file${++n}`;
+        const file = { blob, sharing: null, trashed: false, getId: () => fid, getUrl: () => `https://drive.google.com/file/d/${fid}/view`, setSharing(a, p) { file.sharing = [a, p]; }, setTrashed(t) { file.trashed = t; } };
+        files[fid] = file;
+        return file;
+      },
+      getViewers: () => f.viewers.map((e) => ({ getEmail: () => e })),
+      getEditors: () => [],
+      addViewers(list) { f.viewers.push(...list); },
+    };
+    folders[id] = f;
+    return f;
+  };
+  const root = makeFolder('root');
+  return {
+    files, folders,
+    api: {
+      getRootFolder: () => root, getFolderById: (id) => folders[id], getFileById: (id) => files[id],
+      Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' }, Permission: { VIEW: 'VIEW' },
+    },
+  };
+}
+
 function makeEnv() {
   const files = {};
+  const drive = fakeDrive();
   const props = {};
   const cache = {};
   const fetched = [];
@@ -76,16 +112,19 @@ function makeEnv() {
       DigestAlgorithm: { SHA_256: 'sha256' },
       Charset: { UTF_8: 'utf8' },
       computeDigest: (_a, s) => [...createHash('sha256').update(s, 'utf8').digest()].map((b) => (b > 127 ? b - 256 : b)),
+      // Apps Script byte arrays are signed.
+      base64Decode: (s) => [...Buffer.from(s, 'base64')].map((b) => (b > 127 ? b - 256 : b)),
+      newBlob: (bytes, type, name) => ({ bytes, type, name }),
     },
     UrlFetchApp: { fetchAll: (reqs) => { fetched.push(...reqs); return reqs.map(() => ({ getResponseCode: () => 200, getContentText: () => '' })); } },
     MailApp: { getRemainingDailyQuota: () => 100, sendEmail() {} },
-    DriveApp: {},
+    DriveApp: drive.api,
     Logger: { log() {} },
   };
   vm.createContext(ctx);
   vm.runInContext(readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), ctx);
   const post = (body) => ctx.doPost({ postData: { contents: JSON.stringify(body) } });
-  return { ctx, props, files, fetched, post };
+  return { ctx, props, files, fetched, post, drive };
 }
 
 const form = {
@@ -198,4 +237,62 @@ test('Apps Script: unfinished responses go to "Belum selesai" and are removed on
 
   env.post({ action: 'submit', formId: f.id, answers: { q_name1: 'Faiz' }, meta: { sessionId: 's_a1', path: ['q_name1'] } });
   assert.equal(sh.getLastRow(), 1, 'deleted after submit');
+});
+
+test('Apps Script: uploads land in Drive, are checked by content, tied to the visit, and pruned if never submitted', () => {
+  const env = makeEnv();
+  env.ctx.setup();
+  const key = env.props.ADMIN_KEY;
+  const f = {
+    id: 'f_upl001', title: 'Beasiswa', integrations: { sheetEditors: 'tim@belajarlagi.id' },
+    questions: [{ id: 'q_name1', type: 'short_text', title: 'Nama' }, { id: 'q_ktm01', type: 'file_upload', title: 'KTM', settings: { fileKind: 'image', maxSizeMb: 1 } }],
+    experiment: { id: 'x_real01', status: 'running' }, variants: { B: { questions: [{ id: 'q_name1', type: 'short_text', title: 'Nama' }] } },
+  };
+  assert.equal(env.post({ action: 'saveForm', key, form: f }).ok, true);
+  const ss = Object.values(env.files).find((x) => x.title === 'FormFlow — Beasiswa');
+  const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]).toString('base64');
+  const up = env.post({ action: 'upload', formId: f.id, questionId: 'q_ktm01', sessionId: 's_u1', name: 'ktm.png', type: 'image/png', data: png });
+  assert.equal(up.ok, true, up.error);
+  assert.match(up.file.ref, /^drive:file\d+$/);
+  const folder = Object.values(env.drive.folders).find((x) => x.name === 'Beasiswa (f_upl001)');
+  assert.deepEqual(folder.viewers, ['tim@belajarlagi.id'], 'shared with the team, not public');
+  const html = Buffer.from('<script>alert(1)</script>').toString('base64');
+  assert.match(env.post({ action: 'upload', formId: f.id, questionId: 'q_ktm01', sessionId: 's_u1', name: 'x.png', data: html }).error, /tidak diterima/);
+
+  assert.match(env.post({ action: 'submit', formId: f.id, answers: { q_ktm01: [up.file] }, meta: { sessionId: 's_other' } }).error, /tidak ditemukan/);
+  const sub = env.post({ action: 'submit', formId: f.id, answers: { q_name1: 'Ayu', q_ktm01: [{ ...up.file, name: 'palsu.exe' }] }, meta: { sessionId: 's_u1', device: 'mobile', source: 'IG', variant: 'x_real01:A' } });
+  assert.equal(sub.ok, true, sub.error);
+  const row = ss.getSheetByName('Responses').data[1];
+  const fileId = up.file.ref.slice(6);
+  assert.ok(row.includes(`ktm.png (https://drive.google.com/file/d/${fileId}/view)`), 'server-side name, Drive link');
+  assert.ok(row.includes('mobile') && row.includes('ig') && row.includes('x_real01:A'));
+  assert.equal(ss.getSheetByName('Uploads').data[1][7], sub.responseId, 'attached to the response');
+
+  const res = env.post({ action: 'getResults', key, formId: f.id, days: 30 });
+  assert.deepEqual(res.responses[0].answers.q_ktm01, [{ ref: up.file.ref, name: 'ktm.png', url: `https://drive.google.com/file/d/${fileId}/view` }]);
+  assert.equal(res.responses[0].meta.device, 'mobile');
+
+  // An upload from a visit that never submitted is trashed after a day.
+  const late = env.post({ action: 'upload', formId: f.id, questionId: 'q_ktm01', sessionId: 's_gone', name: 'b.png', data: png });
+  ss.getSheetByName('Uploads').data[2][0] = new Date(Date.now() - 2 * 86400000);
+  env.ctx.pruneOldEvents();
+  assert.equal(env.drive.files[late.file.ref.slice(6)].trashed, true);
+  assert.equal(env.drive.files[fileId].trashed, false);
+
+  // Builder images are shared by link so respondents can see them.
+  const media = env.post({ action: 'media', key, formId: f.id, name: 'logo.png', data: png });
+  assert.match(media.url, /^https:\/\/drive\.google\.com\/thumbnail\?id=file\d+&sz=w2000$/);
+  assert.equal(env.post({ action: 'media', key: 'wrong', formId: f.id, name: 'logo.png', data: png }).ok, false);
+});
+
+test('Apps Script: events carry device / source / A-B variant; forged variants are dropped', () => {
+  const env = makeEnv();
+  env.ctx.setup();
+  const key = env.props.ADMIN_KEY;
+  const f = { ...JSON.parse(JSON.stringify(form)), id: 'f_dim001', title: 'Dim', experiment: { id: 'x_real01', status: 'running' }, variants: { B: { questions: form.questions } } };
+  env.post({ action: 'saveForm', key, form: f });
+  env.post({ action: 'event', formId: f.id, type: 'view', sessionId: 's_1', device: 'mobile', source: 'Facebook', variant: 'x_real01:B' });
+  env.post({ action: 'event', formId: f.id, type: 'view', sessionId: 's_2', device: 'toaster', source: 'x', variant: 'x_fake01:B' });
+  const res = env.post({ action: 'getResults', key, formId: f.id, days: 30 });
+  assert.deepEqual(res.events.map((e) => [e.device, e.source, e.variant]), [['mobile', 'facebook', 'x_real01:B'], ['', 'x', '']]);
 });

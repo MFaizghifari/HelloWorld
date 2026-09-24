@@ -1,51 +1,22 @@
 // FormFlow API on Cloudflare Workers + D1.
 // Speaks the same JSON protocol as apps-script/Code.gs, so the frontend
 // adapter is shared. Static files in ../app are served by Workers Assets.
-import { validateAnswer, partialsEnabled, contactFrom, cleanPartialAnswers, PARTIAL_RETENTION_DAYS } from '../../app/js/logic.js';
-import { answerIncrements, statsFromAggregates } from '../../app/js/stats.js';
+import {
+  validateAnswer, partialsEnabled, contactFrom, cleanPartialAnswers, PARTIAL_RETENTION_DAYS,
+  variantForm, allQuestions, variantTag, answerText,
+} from '../../app/js/logic.js';
+import { answerIncrements, statsFromAggregates, SEGMENT_DIMS } from '../../app/js/stats.js';
+import { deviceOf, validDevice, cleanSource } from '../../app/js/traffic.js';
 import { sendCapi } from './meta.js';
 import { hasGoogleCredentials, parseSheetId, writeHeader, appendRows } from './google.js';
+import { HttpError, CORS, json, validId, validSession, uid } from './http.js';
+import * as auth from './auth.js';
+import { handleUpload, handleMedia, serveFile, serveMedia, resolveFileAnswers, signResponses, purgePendingUploads, deleteFormFiles } from './files.js';
 
 const MAX_BODY = 100_000;
 const MAX_VALUE = 5000;
 const AUTO_HIDDEN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
-const META_KEYS = ['durationSec', 'pageUrl', 'referrer', 'sessionId'];
 const FORM_CACHE_SEC = 30;
-
-class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
-}
-
-// ─── Utilities ──────────────────────────────────────────────────────────────
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Max-Age': '86400',
-};
-
-function json(obj, status = 200, extra = {}) {
-  return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS, ...extra } });
-}
-
-function validId(id) {
-  if (!/^[a-z]_[a-z0-9]{4,20}$/.test(String(id || ''))) throw new HttpError(400, 'ID tidak valid.');
-  return id;
-}
-
-function safeEqual(a, b) {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  if (x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  return diff === 0;
-}
-
-function requireAdmin(env, body) {
-  if (!env.ADMIN_KEY) throw new HttpError(500, 'ADMIN_KEY belum di-set (wrangler secret put ADMIN_KEY).');
-  if (!body.key || !safeEqual(String(body.key), env.ADMIN_KEY)) throw new HttpError(401, 'Admin key salah.');
-}
 
 export function tzOffsetMs(env) {
   const m = Number(env.TZ_OFFSET_MINUTES ?? 420); // default WIB (UTC+7)
@@ -63,8 +34,20 @@ function clean(v) {
   return String(v ?? '').slice(0, MAX_VALUE);
 }
 
-function uid(prefix) {
-  return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+/** Device / source / A-B variant of a visit, as sent by the form page (validated here). */
+function visitDims(form, x, request) {
+  const [experimentId, variant] = String(x?.variant || '').split(':');
+  return {
+    device: validDevice(x?.device) || deviceOf(request?.headers.get('User-Agent') || ''),
+    source: cleanSource(x?.source),
+    variant: variantTag(form, experimentId, variant),
+  };
+}
+
+function bumpSegments(env, formId, day, dims, field) {
+  return SEGMENT_DIMS.filter((d) => dims?.[d]).map((d) => env.DB.prepare(`
+    INSERT INTO segments (form_id, day, dim, value, ${field}) VALUES (?1, ?2, ?3, ?4, 1)
+    ON CONFLICT(form_id, day, dim, value) DO UPDATE SET ${field} = ${field} + 1`).bind(formId, day, d, dims[d]));
 }
 
 // ─── Forms ──────────────────────────────────────────────────────────────────
@@ -88,12 +71,17 @@ async function loadForm(env, id, { cache = true } = {}) {
 function publicForm(form) {
   const f = structuredClone(form);
   delete f.integrations; // webhook URLs & sheet ids stay server-side
+  delete f.experiments; // finished A/B tests
   return f;
 }
 
-async function saveForm(env, form) {
+const EXPERIMENT_LOG = { running: 'experiment.start', paused: 'experiment.pause', ended: 'experiment.end' };
+
+async function saveForm(env, form, actor) {
   if (!form || typeof form !== 'object') throw new HttpError(400, 'Form kosong.');
   validId(form.id);
+  const before = await env.DB.prepare('SELECT json FROM forms WHERE id = ?').bind(form.id).first();
+  const prev = before ? JSON.parse(before.json) : null;
   const now = new Date().toISOString();
   form.updatedAt = now;
   const json = JSON.stringify(form);
@@ -107,6 +95,15 @@ async function saveForm(env, form) {
       sheet_cols = CASE WHEN forms.sheet_id IS ?4 THEN forms.sheet_cols ELSE '[]' END`)
     .bind(form.id, String(form.title || '').slice(0, 300), json, sheetId, now).run();
   if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://formflow.cache/form/${form.id}`));
+  await auth.audit(env, actor, prev ? 'form.publish' : 'form.create', form.title || form.id);
+  const x = form.experiment;
+  const was = prev?.experiment;
+  if (x && (x.id !== was?.id || x.status !== was?.status) && EXPERIMENT_LOG[x.status]) {
+    await auth.audit(env, actor, EXPERIMENT_LOG[x.status], form.title || form.id, `${x.id} · ${x.split ?? 50}% ke B`);
+  } else if (!x && was) {
+    const done = (form.experiments || []).find((e) => e.id === was.id);
+    await auth.audit(env, actor, 'experiment.end', form.title || form.id, done?.winner ? `${was.id} · pemenang ${done.winner}` : was.id);
+  }
   return { ok: true, form, sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : '' };
 }
 
@@ -115,10 +112,14 @@ async function listForms(env) {
   return results.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updated_at, sheetUrl: r.sheet_id ? `https://docs.google.com/spreadsheets/d/${r.sheet_id}/edit` : '' }));
 }
 
-async function deleteForm(env, id) {
+async function deleteForm(env, id, actor) {
   validId(id);
-  await env.DB.batch(['forms', 'responses', 'sessions', 'daily', 'funnel', 'answer_counts', 'partials'].map((t) =>
+  const row = await env.DB.prepare('SELECT title FROM forms WHERE id = ?').bind(id).first();
+  await deleteFormFiles(env, id);
+  await env.DB.batch(['forms', 'responses', 'sessions', 'daily', 'funnel', 'answer_counts', 'partials', 'segments', 'uploads'].map((t) =>
     env.DB.prepare(`DELETE FROM ${t} WHERE ${t === 'forms' ? 'id' : 'form_id'} = ?`).bind(id)));
+  if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://formflow.cache/form/${id}`));
+  await auth.audit(env, actor, 'form.delete', row?.title || id);
   return { ok: true };
 }
 
@@ -126,15 +127,16 @@ async function deleteForm(env, id) {
 // Every event carries the full path so far; we only count what is new since
 // the last event of the same session, so retries and repeated beacons never
 // double count.
-async function applyPath(env, form, sessionId, rawPath, { complete = false, now = new Date() } = {}) {
-  const ids = new Set((form.questions || []).map((q) => q.id));
+async function applyPath(env, form, sessionId, rawPath, { complete = false, now = new Date(), dims = null } = {}) {
+  const ids = new Set(allQuestions(form).map((q) => q.id));
   const path = (Array.isArray(rawPath) ? rawPath : []).map(String).filter((q) => ids.has(q)).slice(0, 200);
   const stmts = [];
-  let s = await env.DB.prepare('SELECT day, started, completed, path FROM sessions WHERE form_id = ? AND id = ?').bind(form.id, sessionId).first();
+  let s = await env.DB.prepare('SELECT day, started, completed, path, device, source, variant FROM sessions WHERE form_id = ? AND id = ?').bind(form.id, sessionId).first();
   if (!s) {
     // No view event recorded (blocked or lost) — start tracking the session now.
-    s = { day: localDay(env, now), started: 0, completed: 0, path: '[]' };
-    stmts.push(env.DB.prepare('INSERT OR IGNORE INTO sessions (form_id, id, day) VALUES (?, ?, ?)').bind(form.id, sessionId, s.day));
+    s = { day: localDay(env, now), started: 0, completed: 0, path: '[]', ...(dims || {}) };
+    stmts.push(env.DB.prepare('INSERT OR IGNORE INTO sessions (form_id, id, day, device, source, variant) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(form.id, sessionId, s.day, s.device || '', s.source || '', s.variant || ''));
   }
   if (s.completed) return;
   const old = JSON.parse(s.path || '[]');
@@ -151,6 +153,7 @@ async function applyPath(env, form, sessionId, rawPath, { complete = false, now 
   if (!s.started && started) {
     stmts.push(env.DB.prepare(`INSERT INTO daily (form_id, day, starts) VALUES (?, ?, 1)
       ON CONFLICT(form_id, day) DO UPDATE SET starts = starts + 1`).bind(form.id, s.day));
+    stmts.push(...bumpSegments(env, form.id, s.day, s, 'starts'));
   }
   for (const q of added) stmts.push(bump('reached', q, 1));
   // "dropped" = sessions whose furthest question is this one and that never finished.
@@ -171,12 +174,13 @@ function cleanHidden(form, hidden) {
  * Keeps the unfinished answers of a session, only when the form opts in and a
  * valid email/phone is present. Never overwrites a session that already submitted.
  */
-async function upsertPartial(env, form, sessionId, body) {
+async function upsertPartial(env, form, sessionId, body, dims) {
   if (!partialsEnabled(form) || !body.answers || typeof body.answers !== 'object') return false;
-  const answers = cleanPartialAnswers(form, body.answers);
-  const contact = contactFrom(form, answers);
+  const shown = variantForm(form, dims.variant.split(':')[1]); // the questions this visitor was shown
+  const answers = cleanPartialAnswers(shown, body.answers);
+  const contact = contactFrom(shown, answers);
   if (!contact) return false;
-  const ids = new Set(form.questions.map((q) => q.id));
+  const ids = new Set(shown.questions.map((q) => q.id));
   const path = (Array.isArray(body.path) ? body.path : []).map(String).filter((q) => ids.has(q));
   const r = await env.DB.prepare(`
     INSERT INTO partials (form_id, session_id, updated_at, answers, hidden, contact, last_question, answered_count)
@@ -189,23 +193,28 @@ async function upsertPartial(env, form, sessionId, body) {
   return r.meta.changes > 0;
 }
 
-async function logEvent(env, body) {
+async function logEvent(env, body, request) {
   const type = String(body.type || '');
   // 'partial' = progress saved right after contact details were entered.
   if (!['view', 'start', 'abandon', 'partial'].includes(type)) throw new HttpError(400, 'Event tidak valid.');
-  const sessionId = String(body.sessionId || '').slice(0, 40);
-  if (!/^s_[a-z0-9]+$/.test(sessionId)) throw new HttpError(400, 'Session tidak valid.');
+  const sessionId = validSession(body.sessionId);
+  if (!sessionId) throw new HttpError(400, 'Session tidak valid.');
   const form = await loadForm(env, body.formId);
+  const dims = visitDims(form, body, request);
   if (type === 'view') {
     const day = localDay(env);
-    const ins = await env.DB.prepare('INSERT OR IGNORE INTO sessions (form_id, id, day) VALUES (?, ?, ?)').bind(form.id, sessionId, day).run();
+    const ins = await env.DB.prepare('INSERT OR IGNORE INTO sessions (form_id, id, day, device, source, variant) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(form.id, sessionId, day, dims.device, dims.source, dims.variant).run();
     if (ins.meta.changes) {
-      await env.DB.prepare(`INSERT INTO daily (form_id, day, views) VALUES (?, ?, 1)
-        ON CONFLICT(form_id, day) DO UPDATE SET views = views + 1`).bind(form.id, day).run();
+      await env.DB.batch([
+        env.DB.prepare(`INSERT INTO daily (form_id, day, views) VALUES (?, ?, 1)
+          ON CONFLICT(form_id, day) DO UPDATE SET views = views + 1`).bind(form.id, day),
+        ...bumpSegments(env, form.id, day, dims, 'views'),
+      ]);
     }
   } else {
-    await applyPath(env, form, sessionId, body.path);
-    if (type === 'abandon' || type === 'partial') await upsertPartial(env, form, sessionId, body);
+    await applyPath(env, form, sessionId, body.path, { dims });
+    if (type === 'abandon' || type === 'partial') await upsertPartial(env, form, sessionId, body, dims);
   }
   return { ok: true };
 }
@@ -215,23 +224,28 @@ async function submit(env, body, request, ctx) {
   const form = await loadForm(env, body.formId);
   if (body.hp) return { ok: true, responseId: uid('r') }; // honeypot: pretend success
 
-  const qById = Object.fromEntries((form.questions || []).map((q) => [q.id, q]));
-  const answers = {};
+  const m = body.meta || {};
+  const sessionId = validSession(m.sessionId);
+  const dims = visitDims(form, m, request);
+  // Answers are checked against the questions of the variant the visitor saw.
+  const shown = variantForm(form, dims.variant.split(':')[1]);
+  const qById = Object.fromEntries((shown.questions || []).map((q) => [q.id, q]));
+  let answers = {};
   for (const [k, v] of Object.entries(body.answers || {})) {
     const q = qById[k];
     if (!q || q.type === 'statement') continue;
     // Required-ness depends on the logic path the respondent took, so only check format here.
     const err = validateAnswer({ ...q, required: false }, v);
     if (err) throw new HttpError(422, `${q.title || k}: ${err}`);
-    answers[k] = clean(v);
+    answers[k] = q.type === 'file_upload' ? v : clean(v);
   }
+  const files = await resolveFileAnswers(env, form, shown.questions || [], answers, sessionId, new URL(request.url).origin);
+  answers = files.answers;
   const hidden = cleanHidden(form, body.hidden);
-  const m = body.meta || {};
   const meta = Object.fromEntries(Object.entries({
     durationSec: Number(m.durationSec) || 0, pageUrl: m.pageUrl, referrer: m.referrer, sessionId: m.sessionId,
-    eventId: m.eventId, userAgent: m.userAgent, fbp: m.fbp, fbc: m.fbc,
+    eventId: m.eventId, userAgent: m.userAgent, fbp: m.fbp, fbc: m.fbc, ...dims,
   }).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, typeof v === 'number' ? v : String(v).slice(0, 1000)]));
-  const sessionId = /^s_[a-z0-9]+$/.test(meta.sessionId || '') ? meta.sessionId : null;
 
   const now = new Date();
   const responseId = uid('r');
@@ -244,15 +258,22 @@ async function submit(env, body, request, ctx) {
   }
 
   const day = localDay(env, now);
+  // Counted under the segments of the visit (fixed by its first event), falling back to what this request says.
+  const session = sessionId ? await env.DB.prepare('SELECT device, source, variant FROM sessions WHERE form_id = ? AND id = ?').bind(form.id, sessionId).first() : null;
   const stmts = [env.DB.prepare(`INSERT INTO daily (form_id, day, completions) VALUES (?, ?, 1)
-    ON CONFLICT(form_id, day) DO UPDATE SET completions = completions + 1`).bind(form.id, day)];
-  for (const [qid, value] of answerIncrements(form, answers, hidden, meta)) {
+    ON CONFLICT(form_id, day) DO UPDATE SET completions = completions + 1`).bind(form.id, day),
+  ...bumpSegments(env, form.id, day, session || dims, 'completions')];
+  for (const [qid, value] of answerIncrements(shown, answers, hidden, meta)) {
     stmts.push(env.DB.prepare(`INSERT INTO answer_counts (form_id, day, question_id, value, count) VALUES (?, ?, ?, ?, 1)
       ON CONFLICT(form_id, day, question_id, value) DO UPDATE SET count = count + 1`).bind(form.id, day, qid, value));
   }
+  for (let i = 0; i < files.keys.length; i += 90) {
+    const chunk = files.keys.slice(i, i + 90);
+    stmts.push(env.DB.prepare(`UPDATE uploads SET response_id = ? WHERE key IN (${chunk.map(() => '?').join(',')})`).bind(responseId, ...chunk));
+  }
   await env.DB.batch(stmts);
   if (sessionId) {
-    await applyPath(env, form, sessionId, m.path, { complete: true, now });
+    await applyPath(env, form, sessionId, m.path, { complete: true, now, dims });
     // The finished response replaces its unfinished copy.
     await env.DB.prepare('DELETE FROM partials WHERE form_id = ? AND session_id = ?').bind(form.id, sessionId).run();
   }
@@ -260,10 +281,10 @@ async function submit(env, body, request, ctx) {
   // Side effects run after the response is sent (ctx.waitUntil) — the respondent never waits on Meta or webhooks.
   const ip = request.headers.get('CF-Connecting-IP') || '';
   const side = [];
-  side.push(sendCapi(env, form, { answers, hidden, meta, ip, now }));
+  side.push(sendCapi(env, shown, { answers, hidden, meta, ip, now }));
   const hook = form.integrations?.webhookUrl;
   if (hook && /^https:\/\//.test(hook)) {
-    const readable = Object.fromEntries((form.questions || []).filter((q) => answers[q.id] !== undefined).map((q) => [q.title || q.id, answers[q.id]]));
+    const readable = Object.fromEntries((shown.questions || []).filter((q) => answers[q.id] !== undefined).map((q) => [q.title || q.id, answers[q.id]]));
     side.push(fetch(hook, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ formId: form.id, formTitle: form.title, responseId, submittedAt: now.toISOString(), answers: readable, rawAnswers: answers, hidden }),
@@ -284,7 +305,7 @@ async function getResults(env, formId, days) {
   const today = new Date(Date.now() + tzOffsetMs(env));
   const since = new Date(today.getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
   const partialCutoff = new Date(Date.now() - PARTIAL_RETENTION_DAYS * 86_400_000).toISOString();
-  const [daily, funnel, counts, recent, total, fm, partials] = await env.DB.batch([
+  const [daily, funnel, counts, recent, total, fm, partials, segments] = await env.DB.batch([
     env.DB.prepare('SELECT day, views, starts, completions FROM daily WHERE form_id = ? AND day >= ?').bind(form.id, since),
     env.DB.prepare('SELECT question_id, SUM(reached) AS reached, SUM(dropped) AS dropped FROM funnel WHERE form_id = ? AND day >= ? GROUP BY question_id').bind(form.id, since),
     env.DB.prepare('SELECT question_id, value, SUM(count) AS count FROM answer_counts WHERE form_id = ? AND day >= ? GROUP BY question_id, value').bind(form.id, since),
@@ -293,9 +314,11 @@ async function getResults(env, formId, days) {
     env.DB.prepare('SELECT sheet_id, sheet_status FROM forms WHERE id = ?').bind(form.id),
     env.DB.prepare(`SELECT session_id, updated_at, answers, hidden, contact, last_question, answered_count FROM partials
       WHERE form_id = ? AND updated_at >= ? ORDER BY updated_at DESC LIMIT 500`).bind(form.id, partialCutoff),
+    env.DB.prepare(`SELECT dim, value, SUM(views) AS views, SUM(starts) AS starts, SUM(completions) AS completions FROM segments
+      WHERE form_id = ? AND day >= ? GROUP BY dim, value`).bind(form.id, since),
   ]);
-  const recentParsed = recent.results.map(parseResponse);
-  const stats = statsFromAggregates(form, { daily: daily.results, funnel: funnel.results, counts: counts.results, recent: recentParsed }, { days, today });
+  const recentParsed = await signResponses(env, recent.results.map(parseResponse));
+  const stats = statsFromAggregates(form, { daily: daily.results, funnel: funnel.results, counts: counts.results, segments: segments.results, recent: recentParsed }, { days, today });
   const f = fm.results[0] || {};
   return {
     ok: true,
@@ -309,6 +332,15 @@ async function getResults(env, formId, days) {
     sheetUrl: f.sheet_id ? `https://docs.google.com/spreadsheets/d/${f.sheet_id}/edit` : '',
     sheetStatus: f.sheet_status || '',
   };
+}
+
+/** Daily views / starts / completions of both variants of an A/B test, over its whole run. */
+async function getExperiment(env, formId, experimentId) {
+  validId(formId);
+  if (!/^x_[a-z0-9]{4,20}$/.test(String(experimentId || ''))) throw new HttpError(400, 'ID uji tidak valid.');
+  const { results } = await env.DB.prepare(`SELECT day, value, views, starts, completions FROM segments
+    WHERE form_id = ? AND dim = 'variant' AND value IN (?, ?) ORDER BY day`).bind(formId, `${experimentId}:A`, `${experimentId}:B`).all();
+  return { ok: true, days: results.map((r) => ({ day: r.day, variant: r.value.split(':')[1], views: r.views, starts: r.starts, completions: r.completions })) };
 }
 
 /** Paged raw export (for CSV). Cursor = "submitted_at|id" of the last row. */
@@ -326,9 +358,11 @@ async function exportResponses(env, formId, after, limit) {
 // ─── Google Sheets mirror ───────────────────────────────────────────────────
 export function sheetColumns(form, existing = []) {
   const want = [['submittedAt', 'Submitted At'], ['responseId', 'Response ID']];
-  for (const q of form.questions || []) if (q.type !== 'statement') want.push([`q:${q.id}`, String(q.title || q.id).replace(/\{\{\s*[\w:-]+\s*\}\}/g, '…')]);
+  for (const q of allQuestions(form)) if (q.type !== 'statement') want.push([`q:${q.id}`, String(q.title || q.id).replace(/\{\{\s*[\w:-]+\s*\}\}/g, '…')]);
   for (const h of [...AUTO_HIDDEN, ...(form.hiddenFields || [])]) want.push([`h:${h}`, h]);
-  want.push(['m:durationSec', 'Durasi (detik)'], ['m:pageUrl', 'Page URL'], ['m:referrer', 'Referrer'], ['m:sessionId', 'Session ID']);
+  want.push(['m:durationSec', 'Durasi (detik)'], ['m:pageUrl', 'Page URL'], ['m:referrer', 'Referrer'], ['m:sessionId', 'Session ID'],
+    ['m:device', 'Perangkat'], ['m:source', 'Sumber']);
+  if (form.variants?.B || form.experiments?.length) want.push(['m:variant', 'Varian A/B']);
   // Existing columns keep their position (rows already written rely on it); titles are refreshed.
   const title = Object.fromEntries(want);
   const cols = existing.map(([k, t]) => [k, title[k] ?? t]);
@@ -344,7 +378,7 @@ function sheetRow(cols, r) {
     const [kind, key] = [k.slice(0, 1), k.slice(2)];
     const v = kind === 'q' ? r.answers[key] : kind === 'h' ? r.hidden[key] : r.meta[key];
     if (v === undefined || v === null) return '';
-    return Array.isArray(v) ? v.join(', ') : v;
+    return typeof v === 'number' ? v : answerText(v);
   });
 }
 
@@ -396,6 +430,37 @@ async function rateLimited(env, request, action) {
   return !success;
 }
 
+// Actions for signed-in members, with the permission each one needs (app/js/roles.js).
+const MEMBER_ACTIONS = {
+  listForms: ['results.view', async (env) => ({ ok: true, forms: await listForms(env) })],
+  getResults: ['results.view', (env, body) => getResults(env, body.formId, Number(body.days) || 30)],
+  getExperiment: ['results.view', (env, body) => getExperiment(env, body.formId, body.experimentId)],
+  exportResponses: ['results.view', (env, body) => exportResponses(env, body.formId, body.after, body.limit)],
+  info: ['results.view', (env) => ({ ok: true, serviceAccountEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '', capi: !!env.FB_CAPI_TOKEN, files: !!env.FILES })],
+  saveForm: ['forms.edit', (env, body, actor) => saveForm(env, body.form, actor)],
+  deleteForm: ['forms.edit', (env, body, actor) => deleteForm(env, body.id, actor)],
+  syncSheets: ['forms.edit', (env) => syncSheets(env)],
+};
+
+// Account and team actions (they check their own permissions).
+const AUTH_ACTIONS = {
+  authStatus: (env) => auth.authStatus(env),
+  authSetup: auth.authSetup,
+  authLogin: auth.authLogin,
+  authLogout: auth.authLogout,
+  authMe: auth.authMe,
+  inviteInfo: auth.inviteInfo,
+  inviteAccept: auth.inviteAccept,
+  accountUpdate: auth.accountUpdate,
+  teamList: auth.teamList,
+  teamInvite: auth.teamInvite,
+  teamRevokeInvite: auth.teamRevokeInvite,
+  teamSetRole: auth.teamSetRole,
+  teamRemove: auth.teamRemove,
+  teamResetLink: auth.teamResetLink,
+  teamTransferOwner: auth.teamTransferOwner,
+};
+
 async function handleApi(request, env, ctx) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
@@ -413,33 +478,43 @@ async function handleApi(request, env, ctx) {
   if (raw.length > MAX_BODY) throw new HttpError(413, 'Payload terlalu besar.');
   let body;
   try { body = JSON.parse(raw || '{}'); } catch { throw new HttpError(400, 'JSON tidak valid.'); }
+  if (!body || typeof body !== 'object') throw new HttpError(400, 'JSON tidak valid.');
   if (await rateLimited(env, request, body.action)) throw new HttpError(429, 'Terlalu banyak permintaan. Coba lagi sebentar.');
-  switch (body.action) {
-    case 'submit': return json(await submit(env, body, request, ctx));
-    case 'event': return json(await logEvent(env, body));
-    case 'saveForm': requireAdmin(env, body); return json(await saveForm(env, body.form));
-    case 'listForms': requireAdmin(env, body); return json({ ok: true, forms: await listForms(env) });
-    case 'deleteForm': requireAdmin(env, body); return json(await deleteForm(env, body.id));
-    case 'getResults': requireAdmin(env, body); return json(await getResults(env, body.formId, Number(body.days) || 30));
-    case 'exportResponses': requireAdmin(env, body); return json(await exportResponses(env, body.formId, body.after, body.limit));
-    case 'syncSheets': requireAdmin(env, body); return json(await syncSheets(env));
-    case 'info': requireAdmin(env, body); return json({ ok: true, serviceAccountEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '', capi: !!env.FB_CAPI_TOKEN });
-    default: throw new HttpError(400, 'Unknown action');
+  if (body.action === 'submit') return json(await submit(env, body, request, ctx));
+  if (body.action === 'event') return json(await logEvent(env, body, request));
+  if (Object.hasOwn(MEMBER_ACTIONS, body.action)) {
+    const [permission, run] = MEMBER_ACTIONS[body.action];
+    const actor = await auth.requirePermission(env, request, body, permission);
+    return json(await run(env, body, actor));
+  }
+  if (Object.hasOwn(AUTH_ACTIONS, body.action)) {
+    const out = await AUTH_ACTIONS[body.action](env, request, body);
+    return out instanceof Response ? out : json(out);
+  }
+  throw new HttpError(400, 'Unknown action');
+}
+
+async function withErrors(run) {
+  try {
+    return await run();
+  } catch (err) {
+    const status = err instanceof HttpError ? err.status : 500;
+    if (status === 500) console.error(err);
+    return json({ ok: false, error: status === 500 ? 'Server error.' : err.message }, status);
   }
 }
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === '/api' || url.pathname === '/api/') {
-      try {
-        return await handleApi(request, env, ctx);
-      } catch (err) {
-        const status = err instanceof HttpError ? err.status : 500;
-        if (status === 500) console.error(err);
-        return json({ ok: false, error: status === 500 ? 'Server error.' : err.message }, status);
-      }
+    if (url.pathname === '/api' || url.pathname === '/api/') return withErrors(() => handleApi(request, env, ctx));
+    if (url.pathname === '/api/upload') {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+      return withErrors(() => handleUpload(request, env, loadForm));
     }
+    if (url.pathname === '/api/media') return withErrors(() => handleMedia(request, env));
+    if (url.pathname.startsWith('/f/')) return withErrors(() => serveFile(request, env, url));
+    if (url.pathname.startsWith('/m/')) return withErrors(() => serveMedia(env, url));
     // Tells the static frontend (served from the same Worker) to use this API.
     if (url.pathname === '/formflow-config.js') {
       return new Response('window.FORMFLOW_CONFIG={backend:"cloud",apiUrl:"/api"};', {
@@ -450,7 +525,6 @@ export default {
     return new Response('Not found', { status: 404 });
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([syncSheets(env), purgeOldPartials(env)]));
+    ctx.waitUntil(Promise.all([syncSheets(env), purgeOldPartials(env), purgePendingUploads(env), auth.purgeAuth(env)]));
   },
 };
-

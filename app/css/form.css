@@ -172,6 +172,44 @@
 .ff :focus-visible { outline: 2px solid var(--ff-a-60); outline-offset: 2px; }
 .ff .ff-text:focus-visible { outline: none; }
 
+/* ─── File upload ───────────────────────────────────────────────────── */
+.ff-upload { max-width: 560px; }
+.ff-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 26px 20px 22px;
+  font: inherit; color: var(--ff-a); background: var(--ff-a-10); border: 1.5px dashed var(--ff-a-60); border-radius: var(--ff-radius);
+  cursor: pointer; text-align: center; transition: background .15s, border-color .15s;
+}
+.ff-drop:hover, .ff-drop.is-over { background: var(--ff-a-30); border-style: solid; }
+.ff-drop:focus-visible { outline: 3px solid var(--ff-a-30); outline-offset: 2px; }
+.ff-drop-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--ff-bg); box-shadow: 0 0 0 1px var(--ff-a-30); margin-bottom: 6px; }
+.ff-drop-title { font-size: 18px; line-height: 1.3; }
+.ff-drop-title strong { font-weight: 700; }
+.ff-drop-or { color: var(--ff-q-70); }
+.ff-drop-hint { font-size: 13px; color: var(--ff-q-50); }
+.ff-drop-compact { flex-direction: row; justify-content: center; padding: 12px 16px; gap: 10px; }
+.ff-drop-compact .ff-drop-icon { width: 32px; height: 32px; margin: 0; }
+.ff-drop-compact .ff-drop-icon .ico { width: 18px; height: 18px; }
+.ff-drop-compact .ff-drop-title { font-size: 15px; }
+.ff-drop-compact .ff-drop-or, .ff-drop-compact .ff-drop-hint { display: none; }
+.ff-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ff-files:not(:empty) { margin-bottom: 10px; }
+.ff-upload .ff-files { order: -1; }
+.ff-upload { display: flex; flex-direction: column; }
+.ff-file { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 8px; border: 1px solid var(--ff-a-30); border-radius: var(--ff-radius); background: var(--ff-bg); }
+.ff-file-thumb, .ff-file-icon { width: 44px; height: 44px; border-radius: calc(var(--ff-radius) * .75); flex: none; }
+.ff-file-thumb { object-fit: cover; background: var(--ff-a-10); }
+.ff-file-icon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: var(--ff-a-10); color: var(--ff-a); font-size: 9px; font-weight: 700; letter-spacing: .04em; }
+.ff-file-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ff-file-name { font-size: 15px; color: var(--ff-q); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-file-meta { font-size: 13px; color: var(--ff-q-50); font-variant-numeric: tabular-nums; }
+.ff-file.is-error { border-color: #F3B8B2; }
+.ff-file.is-error .ff-file-meta { color: #B42318; }
+.ff-file-bar { height: 4px; border-radius: 9999px; background: var(--ff-a-10); overflow: hidden; }
+.ff-file-bar i { display: block; width: 8%; height: 100%; background: var(--ff-a); border-radius: inherit; transition: width .2s; }
+.ff-file-del { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--ff-q-50); cursor: pointer; flex: none; }
+.ff-file-del:hover { background: var(--ff-a-10); color: var(--ff-q); }
+.ff-edit .ff-drop { cursor: default; }
+
 /* ─── Welcome & ending ──────────────────────────────────────────────── */
 .ff-welcome, .ff-ending { text-align: center; display: flex; flex-direction: column; align-items: center; }
 .ff-welcome .ff-desc, .ff-ending .ff-desc { max-width: 34em; margin-top: 14px; }

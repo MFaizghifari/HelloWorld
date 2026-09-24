@@ -33,7 +33,11 @@ export async function capiPayload(form, { answers, hidden, meta, ip, now, testCo
       action_source: 'website',
       event_source_url: String(meta.pageUrl || '').slice(0, 1000),
       user_data: user,
-      custom_data: { form_id: form.id, form_title: form.title, utm_source: hidden.utm_source || '', utm_campaign: hidden.utm_campaign || '' },
+      custom_data: {
+        form_id: form.id, form_title: form.title, utm_source: hidden.utm_source || '', utm_campaign: hidden.utm_campaign || '',
+        // "x_ab12cd:B" while an A/B test runs, so Ads Manager can report conversions per variant.
+        ...(meta.variant ? { ab_variant: String(meta.variant) } : {}),
+      },
     }],
   };
   if (testCode) payload.test_event_code = testCode;

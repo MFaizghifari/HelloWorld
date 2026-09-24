@@ -15,8 +15,107 @@ export const QUESTION_TYPES = {
   rating: { label: 'Rating (bintang)', input: true, scale: true },
   opinion_scale: { label: 'Skala opini', input: true, scale: true },
   date: { label: 'Tanggal', input: true },
+  file_upload: { label: 'Unggah file', input: true },
   statement: { label: 'Pernyataan (tanpa input)', input: false },
 };
+
+// ─── File uploads ───────────────────────────────────────────────────────────
+// Allowed content per question setting. The server checks the file's first
+// bytes against these types, so a renamed .html never passes as a .png.
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+const IMAGE_EXT = '.jpg,.jpeg,.png,.webp,.gif,.heic,.heif'; // some systems report HEIC with an empty type
+const DOC_TYPES = [
+  'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/csv', 'text/plain',
+];
+export const FILE_KINDS = {
+  image: { label: 'Gambar', hint: 'JPG, PNG, WebP, HEIC', accept: `${IMAGE_TYPES.join(',')},${IMAGE_EXT}`, types: IMAGE_TYPES },
+  pdf: { label: 'PDF', hint: 'PDF', accept: 'application/pdf,.pdf', types: ['application/pdf'] },
+  document: { label: 'Dokumen', hint: 'PDF, Word, Excel, PowerPoint', accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt', types: DOC_TYPES },
+  any: { label: 'Gambar & dokumen', hint: 'Gambar, PDF, Word, Excel', accept: `${IMAGE_TYPES.join(',')},${IMAGE_EXT},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt`, types: [...IMAGE_TYPES, ...DOC_TYPES] },
+};
+export const FILE_LIMITS = { defaultMb: 10, maxMb: 25, maxFiles: 10 };
+
+/** Upload rules of a file_upload question, with defaults and hard caps applied. */
+export function fileRules(question) {
+  const s = question?.settings || {};
+  const kind = FILE_KINDS[s.fileKind] ? s.fileKind : 'any';
+  const maxMb = Math.min(FILE_LIMITS.maxMb, Math.max(1, Number(s.maxSizeMb) || FILE_LIMITS.defaultMb));
+  const maxFiles = Math.min(FILE_LIMITS.maxFiles, Math.max(1, Math.round(Number(s.maxFiles) || 1)));
+  return { kind, maxMb, maxBytes: maxMb * 1024 * 1024, maxFiles, types: FILE_KINDS[kind].types, accept: FILE_KINDS[kind].accept };
+}
+
+/** Why a picked file cannot be sent (checked again on the server by content), or null. */
+export function fileProblem(question, file) {
+  const rules = fileRules(question);
+  const ext = (String(file.name).toLowerCase().match(/\.[a-z0-9]+$/) || [''])[0];
+  if (!rules.types.includes(file.type) && !(ext && rules.accept.split(',').includes(ext))) return `${file.name}: jenis file tidak diterima (${FILE_KINDS[rules.kind].hint}).`;
+  if (file.size > rules.maxBytes) return `${file.name}: lebih dari ${rules.maxMb} MB.`;
+  if (!file.size) return `${file.name}: file kosong.`;
+  return null;
+}
+
+/** A file answer: [{ ref, name, type, size, url? }]. */
+export function isFileList(v) {
+  return Array.isArray(v) && v.length > 0 && v.every((f) => f && typeof f === 'object' && typeof f.ref === 'string' && typeof f.name === 'string');
+}
+
+export function formatBytes(n) {
+  const b = Number(n) || 0;
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+  return `${(b / 1024 / 1024).toLocaleString('id-ID', { maximumFractionDigits: 1 })} MB`;
+}
+
+/** Plain-text form of any answer: file names (with links when known), list items, or the value. */
+export function answerText(v) {
+  if (isFileList(v)) return v.map((f) => (f.url ? `${f.name} (${f.url})` : f.name)).join(', ');
+  if (Array.isArray(v)) return v.join(', ');
+  return v === undefined || v === null ? '' : String(v);
+}
+
+// ─── A/B variants ───────────────────────────────────────────────────────────
+// Variant B is a full copy of the screens (welcome, questions, ending, theme)
+// stored in form.variants.B. Everything else (title, Pixel, integrations,
+// hidden fields) is shared, so both variants feed one set of results.
+export const VARIANT_KEYS = ['welcome', 'questions', 'thankyou', 'theme'];
+
+/** The form as variant `v` shows it. */
+export function variantForm(form, v) {
+  const b = v === 'B' ? form?.variants?.B : null;
+  if (!b) return form;
+  const out = { ...form };
+  for (const k of VARIANT_KEYS) if (b[k] !== undefined) out[k] = b[k];
+  return out;
+}
+
+/** Questions of A followed by questions that only exist in B (for results, sheets, CSV). */
+export function allQuestions(form) {
+  const seen = new Set();
+  const out = [];
+  for (const q of [...(form?.questions || []), ...(form?.variants?.B?.questions || [])]) {
+    if (!seen.has(q.id)) { seen.add(q.id); out.push(q); }
+  }
+  return out;
+}
+
+export function withAllQuestions(form) {
+  return form?.variants?.B ? { ...form, questions: allQuestions(form) } : form;
+}
+
+export function experimentRunning(form) {
+  const x = form?.experiment;
+  return !!(x && x.status === 'running' && form.variants?.B && /^x_[a-z0-9]{4,20}$/.test(x.id || ''));
+}
+
+/** Validated "x_id:A" tag for events of the running experiment, or '' when the pair is stale or forged. */
+export function variantTag(form, experimentId, variant) {
+  const x = form?.experiment;
+  if (!x || x.id !== experimentId || !form.variants?.B || (variant !== 'A' && variant !== 'B')) return '';
+  return `${x.id}:${variant}`;
+}
 
 export const OPERATORS = {
   eq: 'sama dengan',
@@ -87,6 +186,16 @@ export function validateAnswer(question, value) {
     }
     case 'yes_no':
       return value === 'Ya' || value === 'Tidak' ? null : 'Pilih Ya atau Tidak.';
+    case 'file_upload': {
+      const rules = fileRules(question);
+      if (!isFileList(value)) return 'File tidak valid.';
+      if (value.length > rules.maxFiles) return `Maksimal ${rules.maxFiles} file.`;
+      for (const f of value) {
+        if (Number(f.size) > rules.maxBytes) return `${f.name}: lebih dari ${rules.maxMb} MB.`;
+        if (f.type && !rules.types.includes(f.type)) return `${f.name}: jenis file tidak diterima.`;
+      }
+      return null;
+    }
     case 'date': {
       const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (!m) return 'Tanggal tidak valid.';
@@ -218,6 +327,7 @@ export function interpolate(text, answers, hidden = {}) {
   return String(text || '').replace(/\{\{\s*([\w:-]+)\s*\}\}/g, (_, key) => {
     if (key.startsWith('hidden:')) return hidden[key.slice(7)] ?? '';
     const v = answers[key];
+    if (isFileList(v)) return v.map((f) => f.name).join(', ');
     if (Array.isArray(v)) return v.join(', ');
     return v ?? '';
   });
@@ -283,7 +393,8 @@ export function cleanPartialAnswers(form, answers = {}) {
   const out = {};
   for (const q of form?.questions || []) {
     const v = answers[q.id];
-    if (q.type === 'statement' || isEmpty(v) || validateAnswer({ ...q, required: false }, v)) continue;
+    // Files of unfinished responses are not kept (data minimisation; they are cleaned up after a day).
+    if (q.type === 'statement' || q.type === 'file_upload' || isEmpty(v) || validateAnswer({ ...q, required: false }, v)) continue;
     out[q.id] = Array.isArray(v) ? v.slice(0, 50).map((x) => String(x).slice(0, 500)) : typeof v === 'number' ? v : String(v).slice(0, 5000);
   }
   return out;

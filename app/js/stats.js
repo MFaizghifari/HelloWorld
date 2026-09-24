@@ -1,8 +1,8 @@
 // Pure analytics aggregation shared by every backend.
-// responses: [{ submittedAt: ISO, responseId, answers: {qid: value}, hidden: {k: v} }]
-// events:    [{ ts: ISO, sessionId, type: 'view'|'start'|'abandon'|'partial'|'complete', path: [qid] }]
+// responses: [{ submittedAt: ISO, responseId, answers: {qid: value}, hidden: {k: v}, meta: {sessionId, device, source, variant} }]
+// events:    [{ ts: ISO, sessionId, type: 'view'|'start'|'abandon'|'partial'|'complete', path: [qid], device?, source?, variant? }]
 
-import { scaleRange, plainTitle } from './logic.js';
+import { scaleRange, plainTitle, isFileList, answerText, allQuestions, withAllQuestions } from './logic.js';
 
 export function dayKey(iso) {
   const d = new Date(iso);
@@ -33,14 +33,39 @@ export function splitMulti(value, options) {
 }
 
 
+// ─── Segments: views / starts / completions per device, source, A/B variant ─
+export const SEGMENT_DIMS = ['device', 'source', 'variant'];
+
+function emptySegments() {
+  return Object.fromEntries(SEGMENT_DIMS.map((d) => [d, {}]));
+}
+
+/** The segment values a session is counted under: fixed by its first event that carries them. */
+export function segmentDims(x = {}) {
+  const dims = { device: String(x.device || ''), source: String(x.source || ''), variant: String(x.variant || '') };
+  return dims.device || dims.source || dims.variant ? dims : null;
+}
+
+function bumpSegments(seg, dims, field) {
+  if (!dims) return;
+  for (const d of SEGMENT_DIMS) {
+    const v = dims[d];
+    if (!v) continue;
+    const row = (seg[d][v] ||= { views: 0, starts: 0, completions: 0 });
+    row[field]++;
+  }
+}
+
 export function computeStats(form, responses, events, { days = 30, today = new Date() } = {}) {
-  const questions = (form.questions || []).filter((q) => q.type !== 'statement');
+  const merged = withAllQuestions(form); // A + questions only variant B has
+  const questions = allQuestions(form).filter((q) => q.type !== 'statement');
 
   // --- Sessions -------------------------------------------------------------
   const sessions = new Map();
   for (const e of events) {
     if (!e.sessionId) continue;
-    const s = sessions.get(e.sessionId) || { view: false, start: false, complete: false, path: [], ts: e.ts };
+    const s = sessions.get(e.sessionId) || { view: false, start: false, complete: false, path: [], ts: e.ts, dims: null };
+    s.dims ||= segmentDims(e);
     if (e.type === 'view') s.view = true;
     if (e.type === 'start') s.start = true;
     if (e.type === 'complete') { s.complete = true; s.start = true; }
@@ -82,14 +107,21 @@ export function computeStats(form, responses, events, { days = 30, today = new D
   const hist = {}; // question id → { value: count }, same shape the Worker stores in D1
   const answered = {};
   for (const r of responses) {
-    for (const [qid, value] of answerIncrements(form, r.answers || {}, r.hidden || {}, r.meta || {})) {
+    for (const [qid, value] of answerIncrements(merged, r.answers || {}, r.hidden || {}, r.meta || {})) {
       if (value === ANSWERED) { answered[qid] = (answered[qid] || 0) + 1; continue; }
       (hist[qid] ||= {})[value] = (hist[qid][value] || 0) + 1;
     }
   }
-  const recentText = (q) => responses.filter((r) => r.answers?.[q.id]).slice(-5).reverse().map((r) => String(r.answers[q.id]));
-  const perQuestion = questions.map((q) => questionSummary(q, hist[q.id] || {}, answered[q.id] || 0, recentText(q)));
-  const sources = hist[SOURCE_KEY] || {};
+  const recentValues = (q) => responses.filter((r) => r.answers?.[q.id]).slice(-RECENT).reverse().map((r) => r.answers[q.id]);
+  const perQuestion = questions.map((q) => questionSummary(q, hist[q.id] || {}, answered[q.id] || 0, recentValues(q)));
+
+  // --- Segments -------------------------------------------------------------
+  const segments = emptySegments();
+  for (const s of all) {
+    if (s.view) bumpSegments(segments, s.dims, 'views');
+    if (s.start) bumpSegments(segments, s.dims, 'starts');
+  }
+  for (const r of responses) bumpSegments(segments, sessions.get(r.meta?.sessionId)?.dims || segmentDims(r.meta), 'completions');
 
   return {
     views,
@@ -101,20 +133,45 @@ export function computeStats(form, responses, events, { days = 30, today = new D
     daily: Object.values(daily),
     funnel,
     perQuestion,
-    sources,
+    segments,
     medianDurationSec: histogramMedian(hist[DURATION_KEY] || {}),
   };
 }
 
+/**
+ * Views / starts / completions per day and variant for one A/B test, from raw
+ * events: the same rows the Worker returns from its segments table.
+ */
+export function experimentDays(responses, events, experimentId) {
+  const prefix = `${experimentId}:`;
+  const sessions = new Map();
+  for (const e of events) {
+    if (!e.sessionId) continue;
+    const s = sessions.get(e.sessionId) || { view: false, start: false, variant: '', day: dayKey(e.ts) };
+    s.variant ||= String(e.variant || '');
+    if (e.type === 'view') s.view = true;
+    if (e.type === 'start' || e.type === 'complete' || ((e.type === 'abandon' || e.type === 'partial') && (e.path || []).length)) s.start = true;
+    sessions.set(e.sessionId, s);
+  }
+  const rows = {};
+  const bump = (day, tag, field) => {
+    if (!day || !tag.startsWith(prefix)) return;
+    const variant = tag.slice(prefix.length);
+    (rows[`${day}|${variant}`] ||= { day, variant, views: 0, starts: 0, completions: 0 })[field]++;
+  };
+  for (const s of sessions.values()) {
+    if (s.view) bump(s.day, s.variant, 'views');
+    if (s.start) bump(s.day, s.variant, 'starts');
+  }
+  for (const r of responses) bump(dayKey(r.submittedAt), sessions.get(r.meta?.sessionId)?.variant || String(r.meta?.variant || ''), 'completions');
+  return Object.values(rows).sort((x, y) => x.day.localeCompare(y.day) || x.variant.localeCompare(y.variant));
+}
+
 // ─── Shared aggregation rules (browser + Cloudflare Worker) ─────────────────
 export const ANSWERED = '__n__';
-export const SOURCE_KEY = '__source';
 export const DURATION_KEY = '__duration';
 const COUNTED = new Set(['multiple_choice', 'dropdown', 'yes_no', 'rating', 'opinion_scale', 'number']);
-
-export function trafficSource(hidden = {}) {
-  return String(hidden.utm_source || (hidden.fbclid ? 'facebook (fbclid)' : '(direct)')).slice(0, 100);
-}
+const RECENT = 8; // latest answers kept per text / file question
 
 /**
  * Counter increments for one submission: [questionId, value] pairs.
@@ -137,7 +194,6 @@ export function answerIncrements(form, answers, hidden = {}, meta = {}) {
       out.push([q.id, String(v)]);
     }
   }
-  out.push([SOURCE_KEY, trafficSource(hidden)]);
   const d = Number(meta.durationSec);
   if (d > 0 && d < 7200) out.push([DURATION_KEY, String(Math.round(d / 5) * 5)]);
   return out;
@@ -155,7 +211,10 @@ export function histogramMedian(hist) {
   return total % 2 ? at((total - 1) / 2) : (at(total / 2 - 1) + at(total / 2)) / 2;
 }
 
-/** Summary card data for one question from its value histogram. */
+/**
+ * Summary card data for one question from its value histogram.
+ * `recent` = the latest raw answers, newest first.
+ */
 export function questionSummary(q, hist, answered, recent = []) {
   const base = { id: q.id, title: plainTitle(q.title), type: q.type, answered };
   if (q.type === 'multiple_choice' || q.type === 'dropdown' || q.type === 'yes_no') {
@@ -188,7 +247,10 @@ export function questionSummary(q, hist, answered, recent = []) {
     }
     return out;
   }
-  return { ...base, kind: 'text', recent };
+  if (q.type === 'file_upload') {
+    return { ...base, kind: 'files', files: recent.flatMap((v) => (isFileList(v) ? v : [])).slice(0, 12) };
+  }
+  return { ...base, kind: 'text', recent: recent.slice(0, 5).map(answerText) };
 }
 
 /**
@@ -196,9 +258,10 @@ export function questionSummary(q, hist, answered, recent = []) {
  *   daily:  [{ day, views, starts, completions }]
  *   funnel: [{ question_id, reached, dropped }]            (already summed over the range)
  *   counts: [{ question_id, value, count }]                 (already summed over the range)
+ *   segments: [{ dim, value, views, starts, completions }]  (already summed over the range)
  *   recent: [{ submittedAt, answers, hidden, meta }]        (newest first)
  */
-export function statsFromAggregates(form, { daily = [], funnel = [], counts = [], recent = [] }, { days = 30, today = new Date() } = {}) {
+export function statsFromAggregates(form, { daily = [], funnel = [], counts = [], segments = [], recent = [] }, { days = 30, today = new Date() } = {}) {
   const byDay = Object.fromEntries(daily.map((d) => [d.day, d]));
   const dailyOut = lastNDays(days, today).map((date) => ({
     date, views: Number(byDay[date]?.views || 0), starts: Number(byDay[date]?.starts || 0), completions: Number(byDay[date]?.completions || 0),
@@ -214,7 +277,12 @@ export function statsFromAggregates(form, { daily = [], funnel = [], counts = []
     else (hist[r.question_id] ||= {})[r.value] = Number(r.count);
   }
   const fmap = Object.fromEntries(funnel.map((f) => [f.question_id, f]));
-  const questions = (form.questions || []).filter((q) => q.type !== 'statement');
+  const questions = allQuestions(form).filter((q) => q.type !== 'statement');
+  const seg = emptySegments();
+  for (const r of segments) {
+    if (!seg[r.dim] || !r.value) continue;
+    seg[r.dim][r.value] = { views: Number(r.views || 0), starts: Number(r.starts || 0), completions: Number(r.completions || 0) };
+  }
   return {
     views,
     starts,
@@ -229,8 +297,8 @@ export function statsFromAggregates(form, { daily = [], funnel = [], counts = []
       return { id: q.id, title: plainTitle(q.title), reached, droppedHere, dropRate: reached ? droppedHere / reached : 0 };
     }),
     perQuestion: questions.map((q) => questionSummary(q, hist[q.id] || {}, answered[q.id] || 0,
-      recent.filter((r) => r.answers?.[q.id]).slice(0, 5).map((r) => String(r.answers[q.id])))),
-    sources: hist[SOURCE_KEY] || {},
+      recent.filter((r) => r.answers?.[q.id]).slice(0, RECENT).map((r) => r.answers[q.id]))),
+    segments: seg,
     medianDurationSec: histogramMedian(hist[DURATION_KEY] || {}),
   };
 }
@@ -238,7 +306,7 @@ export function statsFromAggregates(form, { daily = [], funnel = [], counts = []
 /** RFC 4180 CSV with spreadsheet formula injection neutralised. */
 export function rowsToCSV(head, rows) {
   const esc = (v) => {
-    let s = Array.isArray(v) ? v.join(', ') : String(v ?? '');
+    let s = answerText(v);
     if (/^[=+\-@]/.test(s)) s = `'${s}`; // neutralise spreadsheet formula injection
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
@@ -246,7 +314,7 @@ export function rowsToCSV(head, rows) {
 }
 
 export function toCSV(form, responses) {
-  const qs = (form.questions || []).filter((q) => q.type !== 'statement');
+  const qs = allQuestions(form).filter((q) => q.type !== 'statement');
   const hiddenKeys = form.hiddenFields || [];
   const head = ['Submitted At', 'Response ID', ...qs.map((q) => plainTitle(q.title)), ...hiddenKeys];
   const rows = responses.map((r) => [
@@ -257,7 +325,7 @@ export function toCSV(form, responses) {
 
 /** Unfinished responses (contacts to follow up), newest first. */
 export function partialsCSV(form, partials) {
-  const qs = (form.questions || []).filter((q) => q.type !== 'statement');
+  const qs = allQuestions(form).filter((q) => q.type !== 'statement');
   const title = (id, fallback) => plainTitle(qs.find((q) => q.id === id)?.title) || fallback || '';
   const head = ['Terakhir aktif', 'Nama', 'Email', 'Telepon', 'Berhenti di', 'utm_source', ...qs.map((q) => plainTitle(q.title))];
   const rows = partials.map((p) => [

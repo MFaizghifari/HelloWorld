@@ -42,7 +42,7 @@ export function fbIdentifiers() {
   return { fbp: /^fb\.\d\.\d+\.\d+$/.test(fbp) ? fbp : '', fbc: /^fb\.\d\.\d+\..+$/.test(fbc) ? fbc.slice(0, 500) : '' };
 }
 
-export function createTracker(tracking = {}, { formId, formTitle } = {}) {
+export function createTracker(tracking = {}, { formId, formTitle, variant = '' } = {}) {
   const t = { ...tracking };
   const inIframe = window.parent !== window;
   // When embed.js reports the host already runs a pixel, events are fired there instead.
@@ -74,7 +74,8 @@ export function createTracker(tracking = {}, { formId, formTitle } = {}) {
     loadScript(`https://www.googletagmanager.com/gtm.js?id=${gtm}`);
   }
 
-  const base = { form_id: formId, form_title: formTitle };
+  // ab_variant ("x_ab12cd:B") lets Ads Manager / GA4 report conversions per A/B variant.
+  const base = { form_id: formId, form_title: formTitle, ...(variant ? { ab_variant: variant } : {}) };
 
   function toParent(name, params) {
     // Lets embed.js on the host page fire its own pixel (first-party cookies).

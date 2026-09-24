@@ -16,6 +16,7 @@ export const TYPE_META = {
   opinion_scale: { cat: 'rating', color: '#FEF3C7', ink: '#92400E' },
   number: { cat: 'other', color: '#D1FAE5', ink: '#065F46' },
   date: { cat: 'other', color: '#D1FAE5', ink: '#065F46' },
+  file_upload: { cat: 'other', color: '#D1FAE5', ink: '#065F46' },
 };
 
 export function typeTile(type, label) {
