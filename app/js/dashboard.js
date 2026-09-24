@@ -116,19 +116,31 @@ function render() {
   const { form, responses, events } = current;
   if (!form) return;
   const days = Number(rangeSel.value);
-  const since = Date.now() - days * 86400000;
-  const inRange = (iso) => new Date(iso).getTime() >= since;
-  const resp = responses.filter((r) => inRange(r.submittedAt));
-  const evts = events.filter((e) => inRange(e.ts));
-  const s = computeStats(form, resp, evts, { days });
+  let s;
+  let latest; // newest first
+  let totalInRange;
+  if (current.stats) {
+    // Cloudflare: aggregated server-side; only the latest 100 raw rows are shipped.
+    s = current.stats;
+    latest = responses;
+    totalInRange = s.completions;
+  } else {
+    const since = Date.now() - days * 86400000;
+    const inRange = (iso) => new Date(iso).getTime() >= since;
+    const resp = responses.filter((r) => inRange(r.submittedAt));
+    s = computeStats(form, resp, events.filter((e) => inRange(e.ts)), { days });
+    latest = resp.slice(-100).reverse();
+    totalInRange = resp.length;
+  }
 
   const worst = [...s.funnel].sort((a, b) => b.droppedHere - a.droppedHere)[0];
-  const avgDuration = resp.map((r) => Number(r.meta?.durationSec)).filter((n) => n > 0 && n < 7200);
-  const medDur = avgDuration.length ? avgDuration.sort((a, b) => a - b)[Math.floor(avgDuration.length / 2)] : null;
+  const medDur = s.medianDurationSec === null || s.medianDurationSec === undefined ? null : Math.round(s.medianDurationSec);
 
   dash.replaceChildren(
     el('div', { class: 'row between' }, el('h2', { text: form.title, style: 'margin:0' }),
-      el('span', { class: 'muted small', text: `Data ${days} hari terakhir · ${backend.name === 'sheets' ? 'Google Sheets' : 'lokal'}` })),
+      el('span', { class: 'muted small', text: `Data ${days} hari terakhir · ${{ cloud: 'Cloudflare D1', sheets: 'Google Sheets', local: 'lokal' }[backend.name]}` })),
+    // replaceChildren() would render a literal "null", so spread an empty list instead.
+    ...(current.sheetStatus ? [el('p', { class: `small ${current.sheetStatus.startsWith('ERROR') ? 'bad' : 'muted'}`, text: `Sinkron Google Sheet: ${current.sheetStatus}` })] : []),
     el('div', { class: 'kpis' },
       kpi('Views', fmt.format(s.views), 'sesi unik yang membuka form'),
       kpi('Mulai mengisi', fmt.format(s.starts), `${pct(s.startRate)} dari views`),
@@ -150,7 +162,7 @@ function render() {
           : el('p', { class: 'muted', text: 'Belum ada data.' }))),
     el('h2', { text: 'Jawaban per pertanyaan', style: 'margin:8px 0 0' }),
     el('div', { class: 'grid2' }, s.perQuestion.map(questionCard)),
-    el('section', { class: 'card' }, el('h3', { text: `Jawaban terbaru (${fmt.format(Math.min(100, resp.length))} dari ${fmt.format(resp.length)})` }), responsesTable(form, resp.slice(-100).reverse())),
+    el('section', { class: 'card' }, el('h3', { text: `Jawaban terbaru (${fmt.format(latest.length)} dari ${fmt.format(totalInRange)})` }), responsesTable(form, latest)),
   );
 }
 
@@ -201,7 +213,8 @@ function responsesTable(form, rows) {
 async function load(id) {
   dash.style.opacity = '.5';
   try {
-    const days = Math.max(Number(rangeSel.value), 30);
+    // Apps Script ships raw rows, so fetch ≥30 days once and re-slice locally.
+    const days = backend.name === 'cloud' ? Number(rangeSel.value) : Math.max(Number(rangeSel.value), 30);
     const [form, results] = await Promise.all([backend.getForm(id), backend.getResults(id, days)]);
     current = { form, ...results };
     const link = document.getElementById('sheetLink');
@@ -212,7 +225,7 @@ async function load(id) {
     render();
   } catch (err) {
     dash.replaceChildren(el('div', { class: 'empty-state' }, el('p', { text: `Gagal memuat data: ${err.message}` }),
-      backend.name === 'sheets' ? el('p', { class: 'small', text: 'Pastikan admin key sudah diisi di Pengaturan (halaman builder).' }) : null));
+      backend.name !== 'local' ? el('p', { class: 'small', text: 'Pastikan admin key sudah diisi di Pengaturan (halaman builder).' }) : null));
   } finally {
     dash.style.opacity = '';
   }
@@ -226,13 +239,22 @@ async function init() {
   if (!id) { dash.replaceChildren(el('div', { class: 'empty-state', text: 'Belum ada form. Buat dulu di builder.' })); return; }
   picker.addEventListener('change', () => load(picker.value));
   rangeSel.addEventListener('change', () => {
-    // Larger ranges need a fresh fetch from Sheets; smaller ones re-slice locally.
-    if (backend.name === 'sheets' && Number(rangeSel.value) > 30) load(picker.value || id); else render();
+    // Cloud aggregates per range server-side; Sheets only needs a refetch beyond 30 days.
+    if (backend.name === 'cloud' || (backend.name === 'sheets' && Number(rangeSel.value) > 30)) load(picker.value || id); else render();
   });
   document.getElementById('refresh').addEventListener('click', () => load(picker.value || id));
-  document.getElementById('csv').addEventListener('click', () => {
+  document.getElementById('csv').addEventListener('click', async () => {
     if (!current.form) return;
-    const blob = new Blob([`﻿${toCSV(current.form, current.responses)}`], { type: 'text/csv;charset=utf-8' });
+    const btn = document.getElementById('csv');
+    let rows = current.responses;
+    if (backend.exportAll) {
+      // The dashboard only holds the latest 100; page through everything for the export.
+      btn.disabled = true;
+      try {
+        rows = await backend.exportAll(current.form.id, (n) => { btn.textContent = `Mengambil ${fmt.format(n)}…`; });
+      } catch (err) { toast(`Ekspor gagal: ${err.message}`); return; } finally { btn.disabled = false; btn.textContent = 'Ekspor CSV'; }
+    }
+    const blob = new Blob([`\uFEFF${toCSV(current.form, rows)}`], { type: 'text/csv;charset=utf-8' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `${current.form.title || 'form'}.csv` });
     a.click(); URL.revokeObjectURL(a.href);
   });

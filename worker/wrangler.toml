@@ -1,0 +1,34 @@
+name = "formflow"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# The builder, form and dashboard (../app) are served from the same Worker,
+# so the API lives on the same origin at /api.
+[assets]
+directory = "../app"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "formflow"
+# Paste the id printed by: npx wrangler d1 create formflow --location apac
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Copy new submissions to Google Sheets every 5 minutes.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+# Day boundaries for the dashboard. 420 = WIB (UTC+7), 480 = WITA, 540 = WIT.
+TZ_OFFSET_MINUTES = "420"
+
+# Per-IP limit on submit/event requests. Kept generous because a whole
+# classroom or office can share one IP address.
+[[ratelimits]]
+name = "SUBMIT_LIMITER"
+namespace_id = "1001"
+simple = { limit = 300, period = 60 }
+
+[observability]
+enabled = true

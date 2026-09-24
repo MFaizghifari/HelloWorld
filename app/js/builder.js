@@ -1,6 +1,6 @@
 // Form builder UI.
 import { getBackend } from './api.js';
-import { DEFAULT_CONFIG, getConfig, saveConfig, getAdminKey, setAdminKey } from './config.js';
+import { DEFAULT_CONFIG, getConfig, saveConfig, getAdminKey, setAdminKey, serverConfig } from './config.js';
 import { el } from './dom.js';
 import { END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle } from './logic.js';
 import { ID_PATTERNS, FB_STANDARD_EVENTS } from './tracking.js';
@@ -105,7 +105,36 @@ function shareUrl() {
   if (cfg.backend === 'sheets' && cfg.sheetsUrl && cfg.sheetsUrl !== DEFAULT_CONFIG.sheetsUrl) {
     u.searchParams.set('api', cfg.sheetsUrl);
   }
+  // Same-origin Worker API that the host does not announce by itself (e.g. a custom path).
+  const announced = serverConfig().apiUrl || DEFAULT_CONFIG.apiUrl;
+  if (cfg.backend === 'cloud' && cfg.apiUrl && cfg.apiUrl !== announced) u.searchParams.set('api', cfg.apiUrl);
   return u.href;
+}
+
+let cloudInfo = null; // { serviceAccountEmail, capi } from the Worker
+async function loadCloudInfo() {
+  if (backend.name !== 'cloud' || cloudInfo || !getAdminKey()) return;
+  try { cloudInfo = await backend.info(); if (state.tab === 'tracking') render(); } catch { /* shown elsewhere */ }
+}
+
+function sheetCard(ig) {
+  if (backend.name === 'cloud') {
+    const sa = cloudInfo?.serviceAccountEmail;
+    return el('section', { class: 'card' },
+      el('h3', { text: 'Salinan ke Google Sheets' }),
+      el('p', { class: 'muted small', text: 'Jawaban disimpan di database Cloudflare D1, lalu disalin otomatis ke Google Sheet setiap 5 menit.' }),
+      el('ol', { class: 'small steps' },
+        el('li', { text: 'Buat Google Sheet kosong.' }),
+        el('li', {}, 'Klik Share → tambahkan ', sa ? el('code', { text: sa }) : el('em', { text: 'email service account (lihat README)' }), ' sebagai Editor.'),
+        el('li', { text: 'Tempel link Sheet-nya di bawah, lalu Simpan form.' })),
+      sa ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { navigator.clipboard?.writeText(sa); toast('Email service account disalin ✓'); }, text: 'Salin email service account' }) : null,
+      field('Link Google Sheet', bind(ig, 'sheetUrl', { type: 'url' }), 'Contoh: https://docs.google.com/spreadsheets/d/1AbC…/edit. Jawaban yang sudah masuk sebelum link diisi juga ikut disalin.'),
+      cloudInfo && !sa ? el('p', { class: 'bad small', text: 'Worker belum punya kredensial Google (GOOGLE_SERVICE_ACCOUNT_EMAIL & GOOGLE_PRIVATE_KEY).' }) : null);
+  }
+  return el('section', { class: 'card' },
+    el('h3', { text: 'Google Sheet jawaban' }),
+    field('Bagikan Google Sheet ke (email, pisahkan koma)', bind(ig, 'sheetEditors'), 'Diberi akses edit ke spreadsheet jawaban form ini saat disimpan.'),
+    field('Email notifikasi (opsional)', bind(ig, 'notifyEmail', { type: 'email' }), 'Dikirim oleh Apps Script. Kuota Gmail: 100 email/hari (akun biasa), 1.500 (Workspace).'));
 }
 
 // ─── Tabs ───────────────────────────────────────────────────────────────────
@@ -345,8 +374,8 @@ function renderTracking() {
       validity('fbPixelId'),
       field('Event saat form terkirim', selectEl(FB_STANDARD_EVENTS.map((e) => [e, e]), tr.fbSubmitEvent || 'Lead', (v) => { tr.fbSubmitEvent = v; markDirty(); })),
       el('label', { class: 'check' }, bind(tr, 'stepEvents', { type: 'checkbox' }), el('span', { text: 'Kirim event FormStep per pertanyaan (untuk analisa funnel di Ads)' })),
-      el('label', { class: 'check' }, bind(tr, 'capi', { type: 'checkbox' }), el('span', { text: 'Conversions API (server-side, butuh backend Google Sheets)' })),
-      el('p', { class: 'muted small', text: 'Event otomatis: PageView (buka form), FormStart (jawaban pertama), dan event submit di atas. Event submit dikirim dari browser + server dengan event_id yang sama sehingga Meta men-deduplikasi. Access token CAPI disimpan di Script Properties (FB_CAPI_TOKEN), bukan di sini.' })),
+      el('label', { class: 'check' }, bind(tr, 'capi', { type: 'checkbox' }), el('span', { text: 'Conversions API (server-side, butuh backend Cloudflare atau Google Sheets)' })),
+      el('p', { class: 'muted small', text: 'Event otomatis: PageView (buka form), FormStart (jawaban pertama), dan event submit di atas. Event submit dikirim dari browser + server dengan event_id yang sama sehingga Meta men-deduplikasi. Access token CAPI disimpan sebagai secret FB_CAPI_TOKEN (Worker) atau Script Property (Apps Script), bukan di sini.' })),
     el('section', { class: 'card' },
       el('h3', { text: 'Google Analytics 4 & Tag Manager' }),
       field('GA4 Measurement ID', bind(tr, 'ga4Id', { transform: (v) => v.trim().toUpperCase() }), 'Format: G-XXXXXXXXXX'),
@@ -363,9 +392,8 @@ function renderTracking() {
       el('p', { class: 'muted small', text: 'Pakai di teks dengan {{hidden:nama}}. Bisa dipakai juga sebagai kondisi di tab Logika.' })),
     el('section', { class: 'card' },
       el('h3', { text: 'Integrasi lain' }),
-      field('Webhook URL (opsional)', bind(ig, 'webhookUrl', { type: 'url' }), 'Setiap jawaban baru di-POST (JSON) ke URL ini dari server — cocok untuk Make, Zapier, n8n, atau CRM.'),
-      field('Bagikan Google Sheet ke (email, pisahkan koma)', bind(ig, 'sheetEditors'), 'Diberi akses edit ke spreadsheet jawaban form ini saat disimpan.'),
-      field('Email notifikasi (opsional)', bind(ig, 'notifyEmail', { type: 'email' }), 'Dikirim oleh Apps Script. Kuota Gmail: 100 email/hari (akun biasa), 1.500 (Workspace).')),
+      field('Webhook URL (opsional)', bind(ig, 'webhookUrl', { type: 'url' }), 'Setiap jawaban baru di-POST (JSON) ke URL ini dari server — cocok untuk Make, Zapier, n8n, CRM, atau notifikasi Slack/Telegram.')),
+    sheetCard(ig),
   );
 }
 
@@ -382,7 +410,7 @@ function renderShare() {
     el('pre', { text: text }));
   return el('div', { class: 'stack' },
     state.dirty ? el('div', { class: 'callout warn', text: 'Ada perubahan yang belum disimpan. Simpan dulu agar link menampilkan versi terbaru.' }) : null,
-    backend.name === 'local' ? el('div', { class: 'callout warn', text: 'Mode "Browser ini saja": link hanya berfungsi di browser ini. Hubungkan Google Sheets di Pengaturan untuk membagikan ke publik.' }) : null,
+    backend.name === 'local' ? el('div', { class: 'callout warn', text: 'Mode "Browser ini saja": link hanya berfungsi di browser ini. Hubungkan backend Cloudflare atau Google Sheets di Pengaturan untuk membagikan ke publik.' }) : null,
     el('section', { class: 'card' },
       el('h3', { text: 'Link publik' }),
       el('div', { class: 'row' }, el('input', { type: 'text', readonly: true, value: url, onclick: (e) => e.target.select() }),
@@ -404,7 +432,8 @@ function render() {
   panel.scrollTop = scroll;
   document.getElementById('openDashboard').href = `dashboard.html?id=${encodeURIComponent(state.form.id)}`;
   const cfg = getConfig();
-  document.getElementById('backendPill').textContent = cfg.backend === 'sheets' && cfg.sheetsUrl ? '● Google Sheets' : '● Lokal (demo)';
+  document.getElementById('backendPill').textContent = { cloud: '● Cloudflare D1', sheets: '● Google Sheets', local: '● Lokal (demo)' }[backend.name];
+  loadCloudInfo();
 }
 
 async function refreshPicker() {
@@ -453,20 +482,30 @@ function setupSettings() {
   document.getElementById('openSettings').addEventListener('click', () => {
     const cfg = getConfig();
     form.backend.value = cfg.backend;
-    form.sheetsUrl.value = cfg.sheetsUrl;
+    form.sheetsUrl.value = cfg.sheetsUrl || '';
+    form.apiUrl.value = cfg.apiUrl || '/api';
     form.adminKey.value = getAdminKey();
+    toggleFields();
     dlg.showModal();
   });
+  const toggleFields = () => form.querySelectorAll('[data-for]').forEach((n) => { n.hidden = n.dataset.for !== form.backend.value; });
+  form.backend.addEventListener('change', toggleFields);
   dlg.addEventListener('close', async () => {
     if (dlg.returnValue !== 'save') return;
     const url = form.sheetsUrl.value.trim();
+    const apiUrl = form.apiUrl.value.trim() || '/api';
     if (form.backend.value === 'sheets' && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)) {
       toast('URL Apps Script harus berbentuk https://script.google.com/macros/s/…/exec', 'bad');
       return;
     }
-    saveConfig({ backend: form.backend.value, sheetsUrl: url });
+    if (form.backend.value === 'cloud' && !/^(\/|https:\/\/)/.test(apiUrl)) {
+      toast('URL API harus diawali / atau https://', 'bad');
+      return;
+    }
+    saveConfig({ backend: form.backend.value, sheetsUrl: url, apiUrl });
     setAdminKey(form.adminKey.value.trim());
     backend = getBackend();
+    cloudInfo = null;
     toast('Pengaturan disimpan.');
     await refreshPicker();
     render();

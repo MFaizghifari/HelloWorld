@@ -144,3 +144,5 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .hbar-fill { display: block; height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
 .hbar-value { font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
 [hidden] { display: none !important; }
+.steps { margin: 0 0 12px; padding-left: 18px; }
+.steps li { margin-bottom: 4px; }

@@ -60,30 +60,47 @@ const localBackend = {
   },
 };
 
-// ─── Google Sheets via Apps Script Web App ─────────────────────────────────
-// POST bodies are sent as text/plain to avoid a CORS preflight, which Apps
-// Script web apps do not answer.
-function sheetsBackend(url) {
-  async function call(action, body = {}, { admin = false } = {}) {
+// ─── Remote backends (Google Apps Script, Cloudflare Worker) ───────────────
+// Both speak the same JSON protocol. POST bodies are sent as text/plain to
+// avoid a CORS preflight, which Apps Script web apps do not answer.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function httpBackend(url, name) {
+  // Only the Worker deduplicates submissions (one per session), so only it gets
+  // automatic retries; retrying Apps Script could create duplicate rows.
+  const retries = name === 'cloud' ? 3 : 0;
+
+  async function call(action, body = {}, { admin = false, retry = 0 } = {}) {
     const payload = { action, ...body };
     if (admin) payload.key = getAdminKey();
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      redirect: 'follow',
-    });
-    const data = await res.json().catch(() => ({ ok: false, error: 'Respons backend tidak valid.' }));
-    if (!data.ok) throw new Error(data.error || 'Permintaan gagal.');
-    return data;
+    for (let attempt = 0; ; attempt++) {
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          redirect: 'follow',
+        });
+      } catch (err) {
+        if (attempt < retry) { await sleep(1000 * 2 ** attempt); continue; }
+        throw new Error('Koneksi gagal. Periksa internet Anda.');
+      }
+      if ((res.status === 429 || res.status >= 500) && attempt < retry) { await sleep(1000 * 2 ** attempt); continue; }
+      const data = await res.json().catch(() => ({ ok: false, error: `Respons backend tidak valid (HTTP ${res.status}).` }));
+      if (!data.ok) throw new Error(data.error || 'Permintaan gagal.');
+      return data;
+    }
   }
+
   return {
-    name: 'sheets',
+    name,
     async listForms() { return (await call('listForms', {}, { admin: true })).forms; },
     async getForm(id) {
       // GET is cacheable and cheaper for the public form view.
-      const res = await fetch(`${url}?action=getForm&id=${encodeURIComponent(id)}`);
-      const data = await res.json();
+      const sep = url.includes('?') ? '&' : '?';
+      const res = await fetch(`${url}${sep}action=getForm&id=${encodeURIComponent(id)}`);
+      const data = await res.json().catch(() => ({ ok: false, error: `Backend tidak merespons dengan benar (HTTP ${res.status}).` }));
       if (!data.ok) throw new Error(data.error || 'Form tidak ditemukan.');
       return data.form;
     },
@@ -93,7 +110,7 @@ function sheetsBackend(url) {
     },
     async deleteForm(id) { await call('deleteForm', { id }, { admin: true }); },
     async submit(formId, payload) {
-      const d = await call('submit', { formId, ...payload });
+      const d = await call('submit', { formId, ...payload }, { retry: retries });
       return { responseId: d.responseId };
     },
     async logEvent(formId, event, { beacon = false } = {}) {
@@ -106,15 +123,35 @@ function sheetsBackend(url) {
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, keepalive: true })
         .catch(() => {});
     },
+    /**
+     * Apps Script returns raw rows ({responses, events}); the Worker returns
+     * pre-computed {stats} plus the latest 100 responses.
+     */
     async getResults(formId, days = 30) {
       const d = await call('getResults', { formId, days }, { admin: true });
-      return { responses: d.responses, events: d.events, sheetUrl: d.sheetUrl };
+      return { responses: d.responses, events: d.events || [], stats: d.stats || null, totalResponses: d.totalResponses, sheetUrl: d.sheetUrl, sheetStatus: d.sheetStatus || '' };
     },
+    ...(name === 'cloud' ? {
+      async exportAll(formId, onProgress) {
+        const all = [];
+        let after = null;
+        do {
+          const d = await call('exportResponses', { formId, after, limit: 2000 }, { admin: true });
+          all.push(...d.responses);
+          after = d.next;
+          onProgress?.(all.length);
+        } while (after);
+        return all;
+      },
+      async info() { return call('info', {}, { admin: true }); },
+      async syncNow() { return call('syncSheets', {}, { admin: true }); },
+    } : {}),
   };
 }
 
 export function getBackend() {
   const cfg = getConfig();
-  if (cfg.backend === 'sheets' && cfg.sheetsUrl) return sheetsBackend(cfg.sheetsUrl);
+  if (cfg.backend === 'cloud' && cfg.apiUrl) return httpBackend(cfg.apiUrl, 'cloud');
+  if (cfg.backend === 'sheets' && cfg.sheetsUrl) return httpBackend(cfg.sheetsUrl, 'sheets');
   return localBackend;
 }
