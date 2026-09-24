@@ -8,10 +8,11 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/form.css">
 </head>
-<body class="builder">
+<body>
+<div class="builder" id="app">
   <header class="tb">
     <div class="tb-left">
-      <a class="tb-logo" href="index.html" aria-label="FormFlow">F</a>
+      <span class="tb-logo" aria-label="FormFlow">F</span>
       <nav class="tb-crumb" aria-label="Form">
         <select id="formPicker" class="tb-picker" aria-label="Pilih form"></select>
         <span class="tb-sep">/</span>
@@ -23,7 +24,7 @@
       <button role="tab" data-tab="logic">Logika</button>
       <button role="tab" data-tab="connect">Integrasi</button>
       <button role="tab" data-tab="share">Bagikan</button>
-      <a role="tab" id="resultsTab" href="dashboard.html">Hasil</a>
+      <button role="tab" data-tab="results">Hasil</button>
     </nav>
     <div class="tb-right">
       <span class="tb-status" id="saveStatus"></span>
@@ -73,6 +74,33 @@
       </div>
     </form>
   </dialog>
+
+  <dialog id="previewDialog" class="preview-dialog" aria-label="Pratinjau form">
+    <div class="preview-bar">
+      <strong>Pratinjau</strong>
+      <div class="seg" id="previewDevice">
+        <button type="button" data-device="desktop" class="active">Desktop</button>
+        <button type="button" data-device="mobile">Ponsel</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost small" type="button" id="previewRestart">Ulangi</button>
+        <button class="icon-btn" type="button" id="previewClose" aria-label="Tutup pratinjau"></button>
+      </div>
+    </div>
+    <div class="preview-stage"><div class="preview-frame" id="previewFrame"></div></div>
+  </dialog>
+
+  <dialog id="confirmDialog" class="modal confirm-dialog">
+    <form method="dialog">
+      <h2 id="confirmTitle"></h2>
+      <p class="muted" id="confirmText"></p>
+      <div class="row end">
+        <button class="btn-ghost" value="cancel" type="submit">Batal</button>
+        <button class="btn" value="ok" type="submit" id="confirmOk">Lanjut</button>
+      </div>
+    </form>
+  </dialog>
+</div>
 
   <!-- Served by the Cloudflare Worker; harmless 404 on other hosts. -->
   <script src="formflow-config.js"></script>

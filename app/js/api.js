@@ -8,7 +8,11 @@ const LS = {
   read(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
   },
-  write(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
+  write(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) {
+      throw new Error('Penyimpanan browser tidak tersedia (mode privat atau penyimpanan penuh).');
+    }
+  },
 };
 
 const localBackend = {
@@ -34,8 +38,7 @@ const localBackend = {
     const forms = LS.read('tf_forms', {});
     delete forms[id];
     LS.write('tf_forms', forms);
-    localStorage.removeItem(`tf_resp_${id}`);
-    localStorage.removeItem(`tf_evt_${id}`);
+    try { localStorage.removeItem(`tf_resp_${id}`); localStorage.removeItem(`tf_evt_${id}`); } catch { /* storage unavailable */ }
   },
   async submit(formId, payload) {
     const list = LS.read(`tf_resp_${formId}`, []);

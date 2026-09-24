@@ -66,7 +66,7 @@ export function applyTheme(root, theme) {
   s.setProperty('--ff-a', t.answer);
   s.setProperty('--ff-btn', t.button);
   s.setProperty('--ff-btn-text', t.buttonText);
-  s.setProperty('--ff-font', `'${t.font}', system-ui, sans-serif`);
+  s.setProperty('--ff-font', `'${t.font}', 'DM Sans', system-ui, sans-serif`); // DM Sans: fallback where Fontshare is blocked
   s.setProperty('--ff-radius', { none: '0px', small: '6px', large: '16px' }[t.corners]);
   // Brightness: negative darkens the background image, positive lightens it.
   const b = t.brightness / 100;

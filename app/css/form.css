@@ -33,7 +33,12 @@
 /* Leaving and entering screens share one grid cell, so they overlap during the transition. */
 .ff-stage > .ff-screen { grid-area: 1 / 1; }
 .ff-screen { position: relative; width: 100%; max-width: 760px; padding: 48px 40px; }
-.ff-page { margin: 0; min-height: 100dvh; overflow-x: hidden; overflow-y: auto; }
+.ff-page { margin: 0; min-height: 100dvh; overflow-x: hidden; overflow-y: auto; background: #FCFCFC; }
+.ff-runner { min-height: 100dvh; overflow: visible; }
+/* Inside the builder's preview dialog the runner fills its box and scrolls on its own. */
+.ff-runner.ff-embedded { min-height: 0; height: 100%; overflow: hidden; --ff-stage-h: 100%; }
+.ff-embedded .ff-stage { height: 100%; overflow-y: auto; align-items: safe center; }
+.ff-embedded .ff-progress, .ff-embedded .ff-bottom, .ff-embedded .ff-preview-badge { position: absolute; }
 .ff-enter-up { animation: ffEnterUp .45s cubic-bezier(.2, .7, .2, 1) both; }
 .ff-leave-up { animation: ffLeaveUp .3s ease-in both; }
 .ff-enter-down { animation: ffEnterDown .45s cubic-bezier(.2, .7, .2, 1) both; }
@@ -197,7 +202,7 @@
 .ff-brand strong { font-weight: 700; }
 .ff-preview-badge {
   position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
-  background: #F5B800; color: #060B14; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 9999px;
+  background: #F5B800; color: #060B14; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; white-space: nowrap;
 }
 .ff-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 

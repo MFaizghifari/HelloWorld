@@ -9,16 +9,21 @@ import {
   applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen,
 } from './renderer.js';
 import { ID_PATTERNS, FB_STANDARD_EVENTS } from './tracking.js';
+import { mountForm } from './runner.js';
+import { mountResults } from './results.js';
 
 const panel = document.getElementById('panel');
 const picker = document.getElementById('formPicker');
 const titleInput = document.getElementById('formTitle');
 let backend = getBackend();
 
+// Set by the preview Artifact: runs on browser storage with example data, no external backend.
+const DEMO = !!serverConfig().demo;
+
 const state = {
   form: null,
   forms: [],
-  tab: 'content', // content | logic | connect | share
+  tab: 'content', // content | logic | connect | share | results
   selected: null, // 'welcome' | 'ending' | question id
   side: 'settings', // settings | design
   device: 'desktop', // desktop | mobile
@@ -105,6 +110,30 @@ function toast(msg, kind = '') {
   t.className = `toast show ${kind}`;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => { t.className = 'toast'; }, 3200);
+}
+
+/** In-page confirmation (window.confirm is blocked in sandboxed previews and looks foreign anyway). */
+function confirmDialog(title, text, { okLabel = 'Lanjut', danger = false } = {}) {
+  const dlg = document.getElementById('confirmDialog');
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmText').textContent = text;
+  const ok = document.getElementById('confirmOk');
+  ok.textContent = okLabel;
+  ok.classList.toggle('danger', danger);
+  dlg.returnValue = '';
+  dlg.showModal();
+  return new Promise((resolve) => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true }));
+}
+
+/** Copy with a visible fallback: some embedded views refuse clipboard access. */
+function copyText(text, done = 'Disalin ✓') {
+  const ok = navigator.clipboard?.writeText(text);
+  if (!ok) { toast('Salin manual: pilih teksnya lalu Ctrl/Cmd + C', 'bad'); return; }
+  ok.then(() => toast(done), () => toast('Salin manual: pilih teksnya lalu Ctrl/Cmd + C', 'bad'));
+}
+
+function setUrl(query) {
+  try { history.replaceState(null, '', query || location.pathname); } catch { /* sandboxed frame */ }
 }
 
 function updateStatus() {
@@ -289,9 +318,9 @@ function duplicate(q) {
   markDirty(); render();
 }
 
-function remove(q) {
+async function remove(q) {
   const f = state.form;
-  if (!confirm(`Hapus "${questionTitle(q)}"?`)) return;
+  if (!await confirmDialog('Hapus pertanyaan?', `"${questionTitle(q)}" dan aturan logikanya akan dihapus dari form.`, { okLabel: 'Hapus', danger: true })) return;
   const i = f.questions.indexOf(q);
   f.questions.splice(i, 1);
   state.selected = f.questions[Math.max(0, i - 1)]?.id || 'welcome';
@@ -604,7 +633,7 @@ function sheetCard(ig) {
         el('li', { text: 'Buat Google Sheet kosong.' }),
         el('li', {}, 'Klik Share → tambahkan ', sa ? el('code', { text: sa }) : el('em', { text: 'email service account (lihat README)' }), ' sebagai Editor.'),
         el('li', { text: 'Tempel link Sheet-nya di bawah, lalu Terbitkan.' })),
-      sa ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { navigator.clipboard?.writeText(sa); toast('Email service account disalin ✓'); }, text: 'Salin email service account' }) : null,
+      sa ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { copyText(sa, 'Email service account disalin ✓'); }, text: 'Salin email service account' }) : null,
       field('Link Google Sheet', bind(ig, 'sheetUrl', { type: 'url' }), 'Contoh: https://docs.google.com/spreadsheets/d/1AbC…/edit. Jawaban yang sudah masuk sebelum link diisi juga ikut disalin.'),
       cloudInfo && !sa ? el('p', { class: 'bad small', text: 'Worker belum punya kredensial Google (GOOGLE_SERVICE_ACCOUNT_EMAIL & GOOGLE_PRIVATE_KEY).' }) : null);
   }
@@ -677,13 +706,16 @@ function renderShare() {
   return el('div', { class: 'bw-page' },
     el('div', { class: 'page-head' }, el('h1', { text: 'Bagikan' }), el('p', { class: 'muted', text: 'Bagikan link-nya langsung atau tanam form di website Anda.' })),
     state.dirty ? el('div', { class: 'callout warn', text: 'Ada perubahan yang belum diterbitkan. Klik "Terbitkan" agar link menampilkan versi terbaru.' }) : null,
-    backend.name === 'local' ? el('div', { class: 'callout warn', text: 'Mode "Browser ini saja": link hanya berfungsi di browser ini. Hubungkan backend Cloudflare atau Google Sheets di Pengaturan untuk membagikan ke publik.' }) : null,
+    DEMO ? el('div', { class: 'callout warn', text: 'Ini pratinjau: link di bawah membuka form di tab ini dan jawabannya tersimpan di browser Anda saja. Link publik aktif setelah backend Cloudflare di-deploy.' })
+      : backend.name === 'local' ? el('div', { class: 'callout warn', text: 'Mode "Browser ini saja": link hanya berfungsi di browser ini. Hubungkan backend Cloudflare atau Google Sheets di Pengaturan untuk membagikan ke publik.' }) : null,
     el('section', { class: 'card share-link' },
       el('h3', { text: 'Link form' }),
       el('div', { class: 'row' },
         el('input', { type: 'text', readonly: true, value: url, onclick: (e) => e.target.select(), 'aria-label': 'Link form' }),
-        el('button', { class: 'btn', type: 'button', onclick: () => { navigator.clipboard?.writeText(url); toast('Link disalin ✓'); } }, icon('copy', { size: 16 }), 'Salin'),
-        el('a', { class: 'btn-ghost', href: url, target: '_blank', rel: 'noopener' }, icon('eye', { size: 16 }), 'Buka')),
+        el('button', { class: 'btn', type: 'button', onclick: () => { copyText(url, 'Link disalin ✓'); } }, icon('copy', { size: 16 }), 'Salin'),
+        DEMO
+          ? el('button', { class: 'btn-ghost', type: 'button', onclick: async () => { if (state.dirty) await save(); openPreview(true); } }, icon('eye', { size: 16 }), 'Isi form')
+          : el('a', { class: 'btn-ghost', href: url, target: '_blank', rel: 'noopener' }, icon('eye', { size: 16 }), 'Buka')),
       el('p', { class: 'muted small', text: 'Untuk iklan, tambahkan ?utm_source=…&utm_campaign=… agar sumber traffic tercatat di dashboard.' }),
       state.sheetUrl ? el('a', { class: 'small', href: state.sheetUrl, target: '_blank', rel: 'noopener', text: 'Buka Google Sheet jawaban form ini →' }) : null),
     el('h2', { class: 'section-title', text: 'Tanam di website' }),
@@ -692,8 +724,52 @@ function renderShare() {
     }, el('span', { class: `embed-thumb et-${k}` }, el('i'), el('b')), el('strong', { text: v.label })))),
     el('section', { class: 'card' },
       el('div', { class: 'row between' }, el('p', { class: 'muted small', style: 'margin:0', text: m.desc }),
-        el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { navigator.clipboard?.writeText(m.code); toast('Kode disalin ✓'); } }, icon('copy', { size: 14 }), 'Salin kode')),
+        el('button', { class: 'btn-ghost small', type: 'button', onclick: () => { copyText(m.code, 'Kode disalin ✓'); } }, icon('copy', { size: 14 }), 'Salin kode')),
       el('pre', { text: m.code })));
+}
+
+// ─── Results tab ────────────────────────────────────────────────────────────
+function renderResults() {
+  return el('div', { class: 'bw-page bw-page-wide' });
+}
+
+// ─── Preview dialog ─────────────────────────────────────────────────────────
+let previewHandle = null;
+let previewLive = false;
+/**
+ * live=false: Typeform-style preview, nothing is saved.
+ * live=true (preview Artifact only): the published form, answers saved to this browser and shown in Results.
+ */
+function openPreview(live = false) {
+  previewLive = live === true;
+  const dlg = document.getElementById('previewDialog');
+  const frame = document.getElementById('previewFrame');
+  dlg.querySelector('.preview-bar strong').textContent = previewLive ? 'Form (jawaban disimpan)' : 'Pratinjau';
+  const start = () => {
+    previewHandle?.destroy();
+    // A copy, so answering the preview never touches the draft being edited.
+    previewHandle = mountForm(frame, structuredClone(state.form), previewLive
+      ? { backend, embedded: true, params: new URLSearchParams('utm_source=pratinjau'), onRestart: start }
+      : { preview: true, embedded: true, onRestart: start });
+  };
+  start();
+  if (!dlg.open) dlg.showModal();
+}
+
+function setupPreview() {
+  const dlg = document.getElementById('previewDialog');
+  const frame = document.getElementById('previewFrame');
+  document.getElementById('previewClose').append(icon('close', { size: 18 }));
+  document.getElementById('previewClose').addEventListener('click', () => dlg.close());
+  document.getElementById('previewRestart').addEventListener('click', () => openPreview(previewLive));
+  document.querySelectorAll('#previewDevice button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#previewDevice button').forEach((x) => x.classList.toggle('active', x === b));
+    frame.classList.toggle('mobile', b.dataset.device === 'mobile');
+  }));
+  dlg.addEventListener('close', () => {
+    previewHandle?.destroy(); previewHandle = null;
+    if (previewLive && state.tab === 'results') render(); // show the new answer
+  });
 }
 
 // ─── Render / persistence ───────────────────────────────────────────────────
@@ -702,7 +778,7 @@ function render() {
     b.classList.toggle('active', b.dataset.tab === state.tab);
     b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
   });
-  const views = { content: renderContent, logic: renderLogic, connect: renderConnect, share: renderShare };
+  const views = { content: renderContent, logic: renderLogic, connect: renderConnect, share: renderShare, results: renderResults };
   const scroller = panel.querySelector('.bw-page, .rp-body');
   const scroll = scroller?.scrollTop || 0;
   panel.className = `bw bw-tab-${state.tab}`;
@@ -710,9 +786,14 @@ function render() {
   const again = panel.querySelector('.bw-page, .rp-body');
   if (again) again.scrollTop = scroll;
   if (state.tab === 'content') renderCanvas();
+  if (state.tab === 'results') {
+    mountResults(panel.querySelector('.bw-page'), {
+      backend, formId: state.form.id, form: state.form, canDownload: !DEMO,
+      demoNote: DEMO ? 'Data contoh: kunjungan dan jawaban fiktif dari 14 hari terakhir, supaya grafik terlihat. Isi form lewat tab Bagikan → "Isi form", dan jawaban Anda ikut masuk ke sini.' : '',
+    });
+  }
   if (document.activeElement !== titleInput) titleInput.value = state.form.title || '';
-  document.getElementById('resultsTab').href = `dashboard.html?id=${encodeURIComponent(state.form.id)}`;
-  document.getElementById('backendPill').textContent = { cloud: 'Cloudflare D1', sheets: 'Google Sheets', local: 'Lokal (demo)' }[backend.name];
+  document.getElementById('backendPill').textContent = DEMO ? 'Pratinjau' : { cloud: 'Cloudflare D1', sheets: 'Google Sheets', local: 'Lokal (demo)' }[backend.name];
   updateStatus();
   loadCloudInfo();
 }
@@ -741,7 +822,7 @@ async function save() {
     state.dirty = false;
     toast(sheetUrl ? 'Terbit ✓ Google Sheet siap.' : 'Terbit ✓');
     await refreshPicker();
-    history.replaceState(null, '', `?id=${encodeURIComponent(form.id)}`);
+    setUrl(`?id=${encodeURIComponent(form.id)}`);
   } catch (err) {
     toast(`Gagal menerbitkan: ${err.message}`, 'bad');
   } finally {
@@ -754,7 +835,7 @@ async function openForm(id) {
   try {
     state.form = await backend.getForm(id);
     state.selected = null; state.dirty = false; state.sheetUrl = '';
-    history.replaceState(null, '', `?id=${encodeURIComponent(id)}`);
+    setUrl(`?id=${encodeURIComponent(id)}`);
     await refreshPicker();
     render();
   } catch (err) { toast(err.message, 'bad'); }
@@ -763,7 +844,7 @@ async function openForm(id) {
 function newForm() {
   state.form = blankForm(); state.selected = null; state.dirty = true; state.sheetUrl = '';
   state.tab = 'content';
-  history.replaceState(null, '', location.pathname);
+  setUrl('');
   refreshPicker().then(render);
 }
 
@@ -811,19 +892,19 @@ async function init() {
   setupSettings();
   document.querySelectorAll('.tb-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => { state.tab = b.dataset.tab; render(); }));
   document.getElementById('save').addEventListener('click', save);
-  document.getElementById('preview').addEventListener('click', () => {
-    localStorage.setItem('tf_preview', JSON.stringify(state.form));
-    window.open('form.html?preview=1', '_blank');
-  });
+  setupPreview();
+  document.getElementById('preview').addEventListener('click', () => openPreview(false));
+  if (DEMO) document.getElementById('openSettings').hidden = true;
   titleInput.addEventListener('input', () => {
     state.form.title = titleInput.value;
     markDirty();
     const opt = picker.querySelector(`option[value="${state.form.id}"]`);
     if (opt) opt.textContent = titleInput.value || 'Tanpa judul';
   });
-  picker.addEventListener('change', () => {
+  picker.addEventListener('change', async () => {
     const v = picker.value;
-    if (state.dirty && !confirm('Perubahan belum diterbitkan. Tetap lanjut?')) { picker.value = state.form.id; return; }
+    picker.value = state.form.id;
+    if (state.dirty && !await confirmDialog('Tinggalkan perubahan?', 'Ada perubahan yang belum diterbitkan di form ini. Perubahan itu akan hilang.', { okLabel: 'Tinggalkan' })) return;
     if (v === '__new') newForm(); else openForm(v);
   });
   window.addEventListener('beforeunload', (e) => { if (state.dirty) e.preventDefault(); });
@@ -833,11 +914,20 @@ async function init() {
 
   const id = new URLSearchParams(location.search).get('id');
   const tab = location.hash.slice(1);
-  if (['content', 'logic', 'connect', 'share'].includes(tab)) state.tab = tab;
+  if (['content', 'logic', 'connect', 'share', 'results'].includes(tab)) state.tab = tab;
   state.form = blankForm();
   if (id) { await openForm(id); return; }
   try { state.forms = await backend.listForms(); } catch { state.forms = []; }
   if (state.forms[0]) { await openForm(state.forms[0].id); return; }
+  if (DEMO) {
+    // First visit to the preview: publish the sample form and fill Results with labelled example data.
+    try {
+      await backend.saveForm(state.form);
+      (await import('./demo.js')).seedExampleData(state.form);
+      await openForm(state.form.id);
+      return;
+    } catch { /* storage blocked: continue with an unsaved draft */ }
+  }
   state.dirty = true;
   await refreshPicker();
   render();
