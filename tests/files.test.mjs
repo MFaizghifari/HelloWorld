@@ -144,3 +144,27 @@ test('builder images: editors only, raster formats only, served publicly with lo
   await api(env, { action: 'deleteForm', token: owner.token, id: form.id });
   assert.equal(env.FILES.objects.size, 0);
 });
+
+test('pending uploads have a byte budget, are rate-limited per /64, and PDFs download', async () => {
+  const env = await setup();
+  env.PENDING_FORM_BYTES = String(PNG.length * 2);
+  assert.equal((await up(env, PNG, { s: 's_q1' })).status, 200);
+  assert.equal((await up(env, PNG, { s: 's_q2' })).status, 200);
+  const full = await up(env, PNG, { s: 's_q3' });
+  assert.equal(full.status, 507);
+
+  const keys = [];
+  const v6 = await setup();
+  v6.UPLOAD_LIMITER = { limit: async ({ key }) => { keys.push(key); return { success: true }; } };
+  await up(v6, PNG, { headers: { 'CF-Connecting-IP': '2001:db8:0:1:aaaa::1' } });
+  await up(v6, PNG, { headers: { 'CF-Connecting-IP': '2001:db8::1:ffff:1:2:3' } });
+  assert.deepEqual(keys, ['upload:2001:db8:0:1::/64', 'upload:2001:db8:0:1::/64']);
+
+  env.PENDING_FORM_BYTES = '';
+  const pdf = await (await up(env, PDF, { q: 'q_cv', s: 's_pdf', name: 'cv.pdf' })).json();
+  const signed = await (await import('../worker/src/files.js')).signedFileUrl(env, `https://formflow.test/f/${pdf.file.ref}`);
+  const res = await get(env, new URL(signed).pathname + new URL(signed).search);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('Content-Disposition'), /^attachment/);
+  assert.match(res.headers.get('Content-Security-Policy'), /sandbox/);
+});

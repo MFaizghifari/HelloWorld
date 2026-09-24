@@ -11,6 +11,7 @@ import { sendCapi } from './meta.js';
 import { hasGoogleCredentials, parseSheetId, writeHeader, appendRows } from './google.js';
 import { HttpError, CORS, json, validId, validSession, uid } from './http.js';
 import * as auth from './auth.js';
+import { can } from '../../app/js/roles.js';
 import { handleUpload, handleMedia, serveFile, serveMedia, resolveFileAnswers, signResponses, purgePendingUploads, deleteFormFiles } from './files.js';
 
 const MAX_BODY = 100_000;
@@ -75,6 +76,17 @@ function publicForm(form) {
   return f;
 }
 
+const TOP_SOURCES = 25;
+
+/** Sources are free text (utm_source, referrer host); keep the biggest and fold the long tail into one row. */
+function topSources(rows) {
+  const sources = rows.filter((r) => r.dim === 'source').sort((a, b) => b.views - a.views);
+  if (sources.length <= TOP_SOURCES) return rows;
+  const rest = { dim: 'source', value: '(lainnya)', views: 0, starts: 0, completions: 0 };
+  for (const r of sources.slice(TOP_SOURCES)) for (const k of ['views', 'starts', 'completions']) rest[k] += Number(r[k] || 0);
+  return [...rows.filter((r) => r.dim !== 'source'), ...sources.slice(0, TOP_SOURCES), rest];
+}
+
 const EXPERIMENT_LOG = { running: 'experiment.start', paused: 'experiment.pause', ended: 'experiment.end' };
 
 async function saveForm(env, form, actor) {
@@ -82,6 +94,12 @@ async function saveForm(env, form, actor) {
   validId(form.id);
   const before = await env.DB.prepare('SELECT json FROM forms WHERE id = ?').bind(form.id).first();
   const prev = before ? JSON.parse(before.json) : null;
+  // A GTM container runs any script on the builder's own origin, where a signed-in
+  // session lives. Only admins and the owner may add or change it.
+  const gtm = String(form.tracking?.gtmId || '');
+  if (gtm !== String(prev?.tracking?.gtmId || '') && !can(actor.role, 'team.manage')) {
+    throw new HttpError(403, 'Hanya Admin atau Pemilik yang bisa mengubah GTM Container ID.');
+  }
   const now = new Date().toISOString();
   form.updatedAt = now;
   const json = JSON.stringify(form);
@@ -318,7 +336,7 @@ async function getResults(env, formId, days) {
       WHERE form_id = ? AND day >= ? GROUP BY dim, value`).bind(form.id, since),
   ]);
   const recentParsed = await signResponses(env, recent.results.map(parseResponse));
-  const stats = statsFromAggregates(form, { daily: daily.results, funnel: funnel.results, counts: counts.results, segments: segments.results, recent: recentParsed }, { days, today });
+  const stats = statsFromAggregates(form, { daily: daily.results, funnel: funnel.results, counts: counts.results, segments: topSources(segments.results), recent: recentParsed }, { days, today });
   const f = fm.results[0] || {};
   return {
     ok: true,

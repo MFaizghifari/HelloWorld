@@ -115,6 +115,8 @@ export async function actorFor(env, request, body = {}) {
   const token = String(body.token || bearer(request) || '');
   if (body.key !== undefined || (token && env.ADMIN_KEY && safeEqual(token, env.ADMIN_KEY))) {
     if (!env.ADMIN_KEY) throw new HttpError(500, 'ADMIN_KEY belum di-set (wrangler secret put ADMIN_KEY).');
+    // The admin key is a permanent owner credential: guesses are rate-limited like logins.
+    await limit(env.AUTH_LIMITER, `key:${clientIp(request)}`);
     if (!safeEqual(String(body.key ?? token), env.ADMIN_KEY)) throw new HttpError(401, 'Admin key salah.');
     return SYSTEM;
   }
@@ -168,11 +170,12 @@ export async function authLogin(env, request, body) {
   const locked = row?.locked_until && row.locked_until > new Date().toISOString();
   const ok = await verifyPassword(String(body.password || '').slice(0, 1000), locked || !row ? DUMMY_HASH : row.pass_hash);
   if (!row || locked || !ok) {
-    if (row && !locked) {
-      const failed = Number(row.failed_logins || 0) + 1;
-      const lockUntil = failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString() : null;
-      await env.DB.prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?').bind(lockUntil ? 0 : failed, lockUntil, row.id).run();
-    }
+    // One atomic statement (parallel guesses cannot overwrite each other's count); it also
+    // runs, matching nothing, for unknown or locked accounts so timing reveals nothing.
+    await env.DB.prepare(`UPDATE users SET
+        locked_until = CASE WHEN failed_logins + 1 >= ?2 THEN ?3 ELSE locked_until END,
+        failed_logins = CASE WHEN failed_logins + 1 >= ?2 THEN 0 ELSE failed_logins + 1 END
+      WHERE id = ?1`).bind(row && !locked ? row.id : 'u_none', MAX_FAILED, new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString()).run();
     // Same answer for unknown email, wrong password and a locked account (no account enumeration).
     throw new HttpError(401, `Email atau kata sandi salah. Setelah ${MAX_FAILED} kali salah, akun dikunci ${LOCK_MINUTES} menit.`);
   }
@@ -202,9 +205,35 @@ async function findInvite(env, token) {
   return inv;
 }
 
+/**
+ * A link is only as good as its creator's rights right now: the creator must
+ * still be a member who may give that role (invite) or manage that member at
+ * their current role (reset). Links made with the admin key are always valid.
+ */
+async function checkLinkStillAllowed(env, inv) {
+  if (inv.created_by === 'system') return;
+  const creator = await env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(inv.created_by).first();
+  let allowed = !!creator;
+  if (allowed && inv.kind === 'invite') allowed = assignableRoles(creator.role).includes(inv.role);
+  if (allowed && inv.kind === 'reset') {
+    const target = await env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(inv.user_id).first();
+    allowed = !!target && (inv.created_by === inv.user_id || canManage(creator.role, target.role));
+  }
+  if (!allowed) {
+    await env.DB.prepare('DELETE FROM invites WHERE id = ?').bind(inv.id).run();
+    throw new HttpError(410, 'Link ini tidak berlaku lagi karena peran pembuatnya berubah. Minta link baru ke admin tim.');
+  }
+}
+
+/** Links made by or for a member stop working when their role or membership changes. */
+function revokeLinks(env, userId) {
+  return env.DB.prepare('DELETE FROM invites WHERE created_by = ?1 OR user_id = ?1').bind(userId);
+}
+
 export async function inviteInfo(env, request, body) {
   await limit(env.AUTH_LIMITER, `invite:${clientIp(request)}`);
   const inv = await findInvite(env, body.inviteToken);
+  await checkLinkStillAllowed(env, inv);
   const user = inv.kind === 'reset' ? await env.DB.prepare('SELECT name FROM users WHERE id = ?').bind(inv.user_id).first() : null;
   return { ok: true, kind: inv.kind, email: inv.email, role: inv.role, name: user?.name || '' };
 }
@@ -213,6 +242,7 @@ export async function inviteInfo(env, request, body) {
 export async function inviteAccept(env, request, body) {
   await limit(env.AUTH_LIMITER, `invite:${clientIp(request)}`);
   const inv = await findInvite(env, body.inviteToken);
+  await checkLinkStillAllowed(env, inv);
   const hash = await hashPassword(checkPassword(body.password));
   const name = inv.kind === 'invite' ? cleanName(body.name) : '';
   // Whoever deletes the row owns the single use.
@@ -251,6 +281,7 @@ export async function accountUpdate(env, request, body) {
     await env.DB.batch([
       env.DB.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').bind(hash, me.id),
       env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ? AND token_hash != ?').bind(me.id, current),
+      env.DB.prepare("DELETE FROM invites WHERE user_id = ? AND kind = 'reset'").bind(me.id),
     ]);
     await audit(env, me, 'account.password', me.email);
   }
@@ -263,14 +294,14 @@ export async function teamList(env, request, body) {
   const now = new Date().toISOString();
   const [users, invites, log] = await env.DB.batch([
     env.DB.prepare('SELECT id, email, name, role, created_at, last_seen_at, locked_until FROM users ORDER BY created_at'),
-    env.DB.prepare("SELECT id, email, role, created_at, expires_at FROM invites WHERE kind = 'invite' AND expires_at > ? ORDER BY created_at DESC").bind(now),
+    env.DB.prepare('SELECT id, kind, email, role, created_at, expires_at FROM invites WHERE expires_at > ? ORDER BY created_at DESC').bind(now),
     env.DB.prepare('SELECT ts, actor, action, target, detail FROM audit_log ORDER BY id DESC LIMIT 50'),
   ]);
   return {
     ok: true,
     me: publicUser(me),
     members: users.results.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, createdAt: u.created_at, lastSeenAt: u.last_seen_at, locked: !!(u.locked_until && u.locked_until > now) })),
-    invites: invites.results.map((i) => ({ id: i.id, email: i.email, role: i.role, createdAt: i.created_at, expiresAt: i.expires_at })),
+    invites: invites.results.map((i) => ({ id: i.id, kind: i.kind, email: i.email, role: i.role, createdAt: i.created_at, expiresAt: i.expires_at })),
     activity: log.results,
   };
 }
@@ -295,7 +326,7 @@ export async function teamInvite(env, request, body) {
 
 export async function teamRevokeInvite(env, request, body) {
   const me = await requirePermission(env, request, body, 'team.manage');
-  const inv = await env.DB.prepare("SELECT email FROM invites WHERE id = ? AND kind = 'invite'").bind(String(body.id || '')).first();
+  const inv = await env.DB.prepare('SELECT email FROM invites WHERE id = ?').bind(String(body.id || '')).first();
   if (!inv) throw new HttpError(404, 'Undangan tidak ditemukan.');
   await env.DB.prepare('DELETE FROM invites WHERE id = ?').bind(String(body.id)).run();
   await audit(env, me, 'team.invite_revoke', inv.email);
@@ -316,7 +347,7 @@ export async function teamSetRole(env, request, body) {
   const role = String(body.role || '');
   if (target.id === me.id) throw new HttpError(400, 'Peran sendiri tidak bisa diubah.');
   if (!canManage(me.role, target.role) || !assignableRoles(me.role).includes(role)) throw new HttpError(403, 'Anda tidak bisa memberi peran ini.');
-  await env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, target.id).run();
+  await env.DB.batch([env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, target.id), revokeLinks(env, target.id)]);
   await audit(env, me, 'team.role', target.email, `${ROLES[target.role].label} → ${ROLES[role].label}`);
   return { ok: true };
 }
@@ -329,7 +360,7 @@ export async function teamRemove(env, request, body) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id),
     env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(target.id),
-    env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(target.id),
+    revokeLinks(env, target.id),
   ]);
   await audit(env, me, 'team.remove', target.email);
   return { ok: true };
@@ -362,6 +393,8 @@ export async function teamTransferOwner(env, request, body) {
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET role = 'admin' WHERE role = 'owner'"),
     env.DB.prepare("UPDATE users SET role = 'owner' WHERE id = ?").bind(target.id),
+    revokeLinks(env, target.id),
+    ...(me.id ? [revokeLinks(env, me.id)] : []),
   ]);
   await audit(env, me, 'team.owner', target.email);
   return { ok: true };

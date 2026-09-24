@@ -57,6 +57,17 @@ export function clientIp(request) {
   return request.headers.get('CF-Connecting-IP') || 'unknown';
 }
 
+/** Rate-limit key for a client: the IPv4 address, or the /64 network for IPv6 (one home or phone usually owns a whole /64). */
+export function clientNet(request) {
+  const ip = clientIp(request);
+  if (!ip.includes(':')) return ip;
+  const [head, tail = ''] = ip.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const full = [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+  return `${full.slice(0, 4).map((h) => h.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
+
 /** Per-IP rate limit through a Workers rate-limit binding (skipped when the binding is absent, e.g. in tests). */
 export async function limit(binding, key) {
   if (!binding) return;

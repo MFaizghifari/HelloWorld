@@ -10,13 +10,17 @@
 // not run script on this origin.
 import { fileRules, allQuestions } from '../../app/js/logic.js';
 import { can } from '../../app/js/roles.js';
-import { HttpError, json, validId, validSession, randomHex, base64url, clientIp, limit, readCookie, safeEqual } from './http.js';
+import { HttpError, json, validId, validSession, randomHex, base64url, clientNet, limit, readCookie, safeEqual } from './http.js';
 import { userFromToken, requirePermission, SESSION_COOKIE } from './auth.js';
 
 const MEDIA_MAX = 5 * 1024 * 1024;
 const MEDIA_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp' };
 const SIGNED_TTL_SEC = 3600;
 const PENDING_HOURS = 24;
+// Files not yet attached to a submission are the ones anyone can create, so they get a budget
+// (per form and in total) until the nightly purge clears them.
+export const PENDING_FORM_BYTES = 2 * 1024 ** 3;
+export const PENDING_TOTAL_BYTES = 8 * 1024 ** 3;
 
 const ascii = (b, from, to) => String.fromCharCode(...b.subarray(from, to));
 const starts = (b, sig, at = 0) => sig.every((x, i) => b[at + i] === x);
@@ -95,7 +99,7 @@ async function readBody(request, max) {
 export async function handleUpload(request, env, loadForm) {
   if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed');
   needBucket(env);
-  await limit(env.UPLOAD_LIMITER, `upload:${clientIp(request)}`);
+  await limit(env.UPLOAD_LIMITER, `upload:${clientNet(request)}`);
   const url = new URL(request.url);
   const form = await loadForm(env, url.searchParams.get('form'));
   const questionId = String(url.searchParams.get('question') || '').slice(0, 60);
@@ -111,6 +115,14 @@ export async function handleUpload(request, env, loadForm) {
   // Replacing a file is fine; hundreds of uploads from one visit are not.
   const used = await env.DB.prepare('SELECT COUNT(*) AS n FROM uploads WHERE form_id = ? AND session_id = ? AND question_id = ?').bind(form.id, sessionId, q.id).first();
   if (Number(used.n) >= rules.maxFiles * 3) throw new HttpError(429, 'Terlalu banyak file untuk pertanyaan ini.');
+  const pending = await env.DB.prepare(`SELECT
+      COALESCE(SUM(size), 0) AS total,
+      COALESCE(SUM(CASE WHEN form_id = ? THEN size ELSE 0 END), 0) AS form
+    FROM uploads WHERE response_id IS NULL AND kind = 'answer'`).bind(form.id).first();
+  if (Number(pending.form) + bytes.length > (Number(env.PENDING_FORM_BYTES) || PENDING_FORM_BYTES)
+    || Number(pending.total) + bytes.length > (Number(env.PENDING_TOTAL_BYTES) || PENDING_TOTAL_BYTES)) {
+    throw new HttpError(507, 'Penyimpanan unggahan sedang penuh. Coba lagi nanti atau kirim form tanpa file.');
+  }
 
   const key = `u/${form.id}/${randomHex(16)}`;
   await env.FILES.put(key, bytes, { httpMetadata: { contentType: type }, customMetadata: { name, formId: form.id, questionId: q.id, sessionId } });
@@ -229,16 +241,16 @@ export async function serveFile(request, env, url) {
   if (!obj) return new Response('File tidak ditemukan.', { status: 404 });
   const type = obj.httpMetadata?.contentType || 'application/octet-stream';
   const name = obj.customMetadata?.name || 'file';
-  const pdf = type === 'application/pdf';
-  const inline = pdf || /^image\/(jpeg|png|gif|webp)$/.test(type);
-  const headers = {
-    'Content-Type': type,
-    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(name)}`,
-    'Cache-Control': 'private, max-age=3600',
-    ...SAFE_HEADERS,
-  };
-  if (pdf) delete headers['Content-Security-Policy'];
-  return new Response(obj.body, { headers });
+  // Only images open in the tab; everything else (PDF included, whose viewer runs scripts) downloads.
+  const inline = /^image\/(jpeg|png|gif|webp)$/.test(type);
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': type,
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'Cache-Control': 'private, max-age=3600',
+      ...SAFE_HEADERS,
+    },
+  });
 }
 
 export async function serveMedia(env, url) {
@@ -268,9 +280,14 @@ async function deleteKeys(env, keys) {
 export async function purgePendingUploads(env, { now = Date.now() } = {}) {
   if (!env.FILES) return 0;
   const cutoff = new Date(now - PENDING_HOURS * 3_600_000).toISOString();
-  const { results } = await env.DB.prepare(`SELECT key FROM uploads WHERE response_id IS NULL AND kind = 'answer' AND created_at < ? LIMIT 1000`).bind(cutoff).all();
-  await deleteKeys(env, results.map((r) => r.key));
-  return results.length;
+  let total = 0;
+  for (let round = 0; round < 50; round++) { // up to 50k files per run, within the cron's time limit
+    const { results } = await env.DB.prepare(`SELECT key FROM uploads WHERE response_id IS NULL AND kind = 'answer' AND created_at < ? LIMIT 1000`).bind(cutoff).all();
+    await deleteKeys(env, results.map((r) => r.key));
+    total += results.length;
+    if (results.length < 1000) break;
+  }
+  return total;
 }
 
 export async function deleteFormFiles(env, formId) {

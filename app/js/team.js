@@ -343,10 +343,10 @@ export function createTeamUI(ctx) {
     };
 
     const invites = data.invites.length ? el('section', { class: 'team-section' },
-      el('h3', { text: `Undangan terbuka · ${data.invites.length}` }),
+      el('h3', { text: `Link terbuka · ${data.invites.length}` }),
       el('ul', { class: 'invite-list' }, data.invites.map((i) => el('li', {},
         el('span', { class: 'avatar ghost', text: initials('', i.email) }),
-        el('div', { class: 'member-text' }, el('strong', { text: i.email }), el('small', { class: 'muted', text: `${roleLabel(i.role)} · berlaku sampai ${fmtDate(i.expiresAt)}` })),
+        el('div', { class: 'member-text' }, el('strong', { text: i.email }), el('small', { class: 'muted', text: `${i.kind === 'reset' ? 'Link reset kata sandi' : roleLabel(i.role)} · berlaku sampai ${fmtDate(i.expiresAt)}` })),
         el('button', { class: 'btn-ghost small', type: 'button', onclick: () => act(() => b.teamRevokeInvite(i.id), 'Undangan dibatalkan'), text: 'Batalkan' }))))) : null;
 
     const matrix = el('table', { class: 'role-matrix' },

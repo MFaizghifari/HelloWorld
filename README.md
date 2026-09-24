@@ -72,7 +72,7 @@ npx wrangler login
 npx wrangler d1 create formflow --location apac   # salin database_id ke wrangler.toml
 npx wrangler r2 bucket create formflow-files      # penyimpanan file upload & gambar form
 npm run db:migrate                                # buat tabel di D1
-npx wrangler secret put ADMIN_KEY                 # kunci untuk membuat akun Pemilik (dan pemulihan akun)
+openssl rand -base64 32 | npx wrangler secret put ADMIN_KEY   # kunci acak 32 byte: membuat akun Pemilik (dan pemulihan akun)
 npm run deploy                                    # → https://formflow.<akun>.workers.dev
 ```
 
@@ -161,8 +161,11 @@ Di backend Cloudflare, setiap anggota tim masuk dengan email dan kata sandinya s
 
 - **Peran ditegakkan di server.** Tombol yang disembunyikan di builder hanya kenyamanan; Worker menolak aksi di luar peran dengan HTTP 403, juga untuk sesi yang sudah terbuka saat perannya diturunkan.
 - **Undangan dan reset kata sandi memakai link sekali pakai** (undangan 7 hari, reset 24 jam). FormFlow tidak mengirim email, jadi admin menyalin link atau mengirimnya lewat tombol WhatsApp. Pemilik yang lupa kata sandi membuat link reset sendiri dengan admin key dari halaman masuk.
+- **Link ikut hak pembuatnya.** Saat link dipakai, server memeriksa ulang bahwa pembuatnya masih anggota dan masih boleh memberi peran itu (atau mengelola anggota itu). Link yang dibuat oleh atau untuk seseorang langsung batal saat perannya diubah, ia dikeluarkan, atau kepemilikan dipindahkan; link reset batal saat pemiliknya mengganti kata sandi. Semua link yang masih terbuka, termasuk link reset, terlihat di menu Tim dan bisa dibatalkan.
+- **GTM hanya untuk Admin dan Pemilik.** Container GTM bisa menjalankan skrip apa pun di domain builder, tempat sesi login tersimpan. Editor tetap bisa mengatur Pixel dan GA4 (ID-nya divalidasi ketat), tapi perubahan GTM Container ID ditolak server (HTTP 403). Untuk isolasi penuh, sajikan form responden di domain terpisah dari builder (mis. `isi.belajarlagi.id` dan `admin.belajarlagi.id`).
+- **Admin key:** buat dengan `openssl rand -base64 32` (256 bit). Tebakan admin key ikut rate limit login (10/menit per IP).
 - **Kata sandi:** minimal 8 karakter tanpa aturan komposisi, sesuai [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html). Disimpan sebagai PBKDF2-HMAC-SHA256 100.000 iterasi dengan salt acak. OWASP menyarankan 600.000 iterasi ([Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)), tapi Workers membatasi iterasi PBKDF2 (workerd menolak dengan `iteration counts above … are not supported`, dan batas produksi yang umum dilaporkan adalah 100.000); jumlah iterasi ikut disimpan per hash sehingga bisa dinaikkan nanti (hash lama diperbarui saat login). Di workerd lokal, satu verifikasi ±43 ms CPU, jadi gunakan **Workers Paid** (batas CPU paket gratis 10 ms).
-- **Perlindungan login:** 5 kali salah → akun dikunci 15 menit; rate limit 10 percobaan/menit per IP dan per email; pesan error sama untuk email tak terdaftar dan kata sandi salah.
+- **Perlindungan login:** 5 kali salah → akun dikunci 15 menit (penghitung dinaikkan secara atomik di D1, jadi tebakan paralel tetap terhitung); rate limit 10 percobaan/menit per IP dan per email; pesan error dan pola query sama untuk email tak terdaftar dan kata sandi salah.
 - **Sesi:** token acak 32 byte, berlaku 30 hari, hanya hash SHA-256 yang disimpan di D1. Mengganti kata sandi atau reset mengakhiri sesi di perangkat lain; mengeluarkan anggota langsung mengakhiri semua sesinya.
 - **Log aktivitas** (menu Tim): siapa menerbitkan/menghapus form, memulai/mengakhiri uji A/B, mengundang, mengubah peran, atau mengeluarkan anggota. Disimpan 13 bulan.
 - **Apps Script** tidak punya akun tim: aksesnya tetap satu admin key, dan akses Sheet diatur lewat berbagi Google Drive. **Mode lokal/pratinjau** mensimulasikan tim di browser (ada pilihan "Lihat sebagai" untuk mencoba tiap peran).
@@ -182,7 +185,9 @@ Keamanan dan privasi:
 - **File hanya untuk tim.** Dashboard memakai link bertanda tangan yang berlaku 1 jam. Link permanen di Sheet, CSV, dan webhook hanya terbuka untuk anggota tim yang sedang masuk; pengunjung lain mendapat halaman "masuk dulu" (HTTP 401).
 - **File milik kunjungan itu sendiri.** Saat submit, server hanya menerima file yang diunggah oleh sesi yang sama untuk pertanyaan yang sama, dan memakai nama/jenis/ukuran versi server.
 - **Tidak ada file yatim.** File dari pengunjung yang tidak mengirim form dihapus otomatis setelah 24 jam (cron Worker; di Apps Script lewat `pruneOldEvents()`, pasang sebagai trigger harian). File tidak ikut disimpan di data "Belum selesai". Menghapus form menghapus semua filenya. Ini sejalan dengan prinsip pembatasan penyimpanan di UU PDP (UU 27/2022), karena foto KTM atau CV adalah data pribadi.
-- **Batas:** 60 upload/menit per IP, maksimal 3× jumlah file per pertanyaan per kunjungan.
+- **Batas:** 60 upload/menit per IPv4 atau per jaringan IPv6 /64 (satu rumah atau ponsel biasanya mendapat satu /64, jadi berganti alamat di dalamnya tidak melewati batas), maksimal 3× jumlah file per pertanyaan per kunjungan.
+- **Kuota file yang belum dikirim.** Siapa pun bisa mengunggah sebelum submit, jadi total file yang belum menempel ke jawaban dibatasi 2 GB per form dan 8 GB total (atur lewat variabel `PENDING_FORM_BYTES` / `PENDING_TOTAL_BYTES`). Jika penuh, upload baru ditolak (HTTP 507) sampai pembersihan 24 jam berjalan; file yang sudah terkirim tidak terpengaruh. Di Apps Script, batasnya 1 GB unggahan per form per hari (Script Property `UPLOAD_DAILY_MB`). Catatan: Apps Script memindahkan file ke Trash Drive, yang tetap memakai kuota sampai dikosongkan otomatis setelah 30 hari.
+- **Hanya gambar yang dibuka di tab.** PDF dan dokumen selalu diunduh (`Content-Disposition: attachment`), karena penampil PDF browser bisa menjalankan skrip.
 
 **Biaya R2:** gratis sampai 10 GB penyimpanan, 1 jt operasi tulis dan 10 jt operasi baca per bulan, dan tanpa biaya egress. Setelahnya US$0,015/GB-bulan ([R2 pricing](https://developers.cloudflare.com/r2/pricing/)). Contoh: jika 20% dari 30.000 isian/bulan mengunggah foto 2 MB, bertambah ±12 GB/bulan, atau sekitar US$0,2 per bulan untuk tiap 12 GB di atas kuota gratis.
 
@@ -263,8 +268,8 @@ npm test
 - `tests/logic.test.mjs`: logic jump, operator, validasi, piping, progress, deteksi loop
 - `tests/stats.test.mjs`: funnel, completion, NPS, sumber traffic, CSV aman formula
 - `tests/apps-script.test.mjs`: `Code.gs` asli dengan mock SpreadsheetApp/UrlFetchApp/DriveApp (termasuk upload ke Drive dan kolom perangkat/sumber/varian)
-- `tests/team.test.mjs`: setup Pemilik, login (pesan error seragam, kunci 15 menit), peran ditegakkan server, undangan & reset sekali pakai, ganti kata sandi, log aktivitas
-- `tests/files.test.mjs`: deteksi jenis dari isi file, batas ukuran (termasuk body tanpa Content-Length), file harus milik sesi yang sama, link bertanda tangan / cookie tim, pembersihan 24 jam, gambar builder
+- `tests/team.test.mjs`: setup Pemilik, login (pesan error seragam, kunci 15 menit, termasuk 5 tebakan paralel), rate limit admin key, peran ditegakkan server, undangan & reset sekali pakai dan batal saat peran pembuatnya berubah, GTM hanya Admin, ganti kata sandi, log aktivitas
+- `tests/files.test.mjs`: deteksi jenis dari isi file, batas ukuran (termasuk body tanpa Content-Length), file harus milik sesi yang sama, link bertanda tangan / cookie tim, pembersihan 24 jam, kuota file belum terkirim, rate limit per /64 IPv6, PDF selalu diunduh, gambar builder
 - `tests/ab-traffic.test.mjs`: ukuran sampel (1.565 per varian di 50% ± 5 poin, sama dengan kalkulator Evan Miller), vonis uji A/B, pembagian acak, klasifikasi perangkat & sumber, varian form
 - `tests/worker.test.mjs`: Worker asli di atas SQLite sungguhan (`node:sqlite`) dengan migrasi D1:
   - admin key, validasi, submit idempoten, payload CAPI (IP + hash SHA-256)
@@ -283,3 +288,5 @@ Selain itu, alur builder → form → dashboard → ekspor CSV dan alur pemuliha
 - Akun tim hanya ada di backend Cloudflare. Di Apps Script, admin key disimpan di `localStorage` browser admin; jangan gunakan builder di komputer bersama.
 - Upload ke Google Drive (Apps Script) baru diuji dengan mock, belum di akun Google sungguhan.
 - Di host selain Worker (mis. GitHub Pages), browser mencatat 404 untuk `formflow-config.js`. Ini tidak berbahaya.
+- Parameter `?api=` di link hanya berlaku di halaman form responden, bukan di builder, supaya link buatan orang lain tidak bisa mengarahkan admin key atau token login ke server lain.
+- Sumber traffic ditampilkan 25 teratas; sisanya digabung menjadi "(lainnya)" agar dashboard tetap ringan meski `utm_source` diisi sembarang.

@@ -30,7 +30,10 @@ export function getConfig() {
   // Share links may carry the backend URL so forms work without editing this file.
   // Only Apps Script or same-origin URLs are accepted, so a crafted link cannot
   // render someone else's form (and collect answers) on this domain.
-  const api = new URLSearchParams(location.search).get('api');
+  // Only the respondent page reads it: the builder holds sign-in tokens and admin keys
+  // that must never be sent to a backend chosen by whoever crafted the link.
+  const onFormPage = /\/form\.html$/.test(location.pathname);
+  const api = onFormPage ? new URLSearchParams(location.search).get('api') : null;
   if (api && /^https:\/\/script\.google(usercontent)?\.com\//.test(api)) {
     cfg = { ...cfg, backend: 'sheets', sheetsUrl: api };
   } else if (api && sameOrigin(api)) {

@@ -879,7 +879,9 @@ function renderConnect() {
           el('h3', { text: 'Google Analytics 4 & Tag Manager' }),
           field('GA4 Measurement ID', bind(tr, 'ga4Id', { transform: (v) => v.trim().toUpperCase() }), 'Format: G-XXXXXXXXXX'),
           validity('ga4Id'),
-          field('GTM Container ID', bind(tr, 'gtmId', { transform: (v) => v.trim().toUpperCase() }), 'Format: GTM-XXXXXXX. Event dataLayer: form_start, form_step, form_submit.'),
+          can(state.user?.role || 'owner', 'team.manage')
+            ? field('GTM Container ID', bind(tr, 'gtmId', { transform: (v) => v.trim().toUpperCase() }), 'Format: GTM-XXXXXXX. Event dataLayer: form_start, form_step, form_submit.')
+            : field('GTM Container ID', el('input', { type: 'text', value: tr.gtmId || '', disabled: true }), 'Hanya Admin atau Pemilik yang bisa mengubahnya: GTM menjalankan skrip apa pun di domain ini.'),
           validity('gtmId'))),
       el('div', { class: 'stack' },
         el('section', { class: 'card' },

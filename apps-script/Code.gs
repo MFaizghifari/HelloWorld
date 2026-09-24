@@ -668,6 +668,13 @@ function upload_(body) {
   var used = Number(cache.get(countKey) || 0);
   if (used >= maxFiles * 3) throw new Error('Terlalu banyak file untuk pertanyaan ini.');
   cache.put(countKey, String(used + 1), 21600);
+  // Anyone can upload before submitting, so each form gets a daily byte budget
+  // (Script Property UPLOAD_DAILY_MB, default 1024) to protect the Drive quota.
+  var budget = (Number(prop_('UPLOAD_DAILY_MB')) || 1024) * 1024 * 1024;
+  var dayKey = 'upb_' + form.id + '_' + Utilities.formatDate(new Date(), 'UTC', 'yyyyMMdd');
+  var spent = Number(cache.get(dayKey) || 0);
+  if (spent + bytes.length > budget) throw new Error('Penyimpanan unggahan untuk hari ini sudah penuh. Coba lagi besok atau kirim form tanpa file.');
+  cache.put(dayKey, String(spent + bytes.length), 86400);
 
   var file = uploadsFolder_(form).createFile(Utilities.newBlob(bytes, type, name));
   var ss = SpreadsheetApp.openById(rec.sheetId);

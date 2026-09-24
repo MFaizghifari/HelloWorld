@@ -115,6 +115,7 @@ function makeEnv() {
       // Apps Script byte arrays are signed.
       base64Decode: (s) => [...Buffer.from(s, 'base64')].map((b) => (b > 127 ? b - 256 : b)),
       newBlob: (bytes, type, name) => ({ bytes, type, name }),
+      formatDate: (d) => d.toISOString().slice(0, 10).replace(/-/g, ''),
     },
     UrlFetchApp: { fetchAll: (reqs) => { fetched.push(...reqs); return reqs.map(() => ({ getResponseCode: () => 200, getContentText: () => '' })); } },
     MailApp: { getRemainingDailyQuota: () => 100, sendEmail() {} },
@@ -283,6 +284,10 @@ test('Apps Script: uploads land in Drive, are checked by content, tied to the vi
   const media = env.post({ action: 'media', key, formId: f.id, name: 'logo.png', data: png });
   assert.match(media.url, /^https:\/\/drive\.google\.com\/thumbnail\?id=file\d+&sz=w2000$/);
   assert.equal(env.post({ action: 'media', key: 'wrong', formId: f.id, name: 'logo.png', data: png }).ok, false);
+
+  // A daily byte budget per form protects the Drive quota.
+  env.props.UPLOAD_DAILY_MB = String(30 / 1024 / 1024); // 30 bytes; 24 already used today, this file is 12
+  assert.match(env.post({ action: 'upload', formId: f.id, questionId: 'q_ktm01', sessionId: 's_u9', name: 'c.png', data: png }).error, /penuh/);
 });
 
 test('Apps Script: events carry device / source / A-B variant; forged variants are dropped', () => {

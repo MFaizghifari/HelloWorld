@@ -158,3 +158,59 @@ test('role helpers used by the builder', () => {
   assert.equal(can('admin', 'team.manage'), true);
   assert.deepEqual(allowedTabs('viewer'), ['share', 'ab', 'results']);
 });
+
+test('links are re-checked when used and die with their creator\'s rights', async () => {
+  const env = makeEnv();
+  const ownerToken = await owner(env);
+  const admin = await join(env, ownerToken, 'admin@contoh.id', 'admin');
+  const editor = await join(env, ownerToken, 'editor@contoh.id', 'editor');
+
+  // An admin's pending invite and reset link stop working once the admin is demoted.
+  const inv = await api(env, { action: 'teamInvite', token: admin.token, email: 'baru@contoh.id', role: 'admin' });
+  const reset = await api(env, { action: 'teamResetLink', token: admin.token, userId: editor.user.id });
+  assert.equal(reset.ok, true, reset.error);
+  const listed = await api(env, { action: 'teamList', token: ownerToken });
+  assert.deepEqual(listed.invites.map((i) => i.kind).sort(), ['invite', 'reset'], 'reset links are visible too');
+  assert.equal((await api(env, { action: 'teamSetRole', token: ownerToken, userId: admin.user.id, role: 'editor' })).ok, true);
+  assert.equal((await api(env, { action: 'inviteAccept', inviteToken: inv.token, name: 'Baru', password: 'sandi-baru-123' })).status, 404, 'revoked with the role change');
+  assert.equal((await api(env, { action: 'inviteAccept', inviteToken: reset.token, password: 'diambil-alih-1' })).status, 404);
+
+  // Even a link that slipped past revocation is checked against its creator's role at use time.
+  const late = await api(env, { action: 'teamInvite', token: ownerToken, email: 'lagi@contoh.id', role: 'admin' });
+  env.DB.raw.prepare("UPDATE invites SET created_by = ? WHERE kind = 'invite'").run(admin.user.id); // creator is now an editor
+  assert.equal((await api(env, { action: 'inviteAccept', inviteToken: late.token, name: 'Lagi', password: 'sandi-lagi-123' })).status, 410);
+  assert.equal((await api(env, { action: 'authLogin', email: 'editor@contoh.id', password: 'sandi-anggota-1' })).ok, true, 'editor keeps their password');
+
+  // Links survive nothing about a removed member either.
+  const reset2 = await api(env, { action: 'teamResetLink', token: ownerToken, userId: editor.user.id });
+  await api(env, { action: 'teamRemove', token: ownerToken, userId: editor.user.id });
+  assert.equal((await api(env, { action: 'inviteAccept', inviteToken: reset2.token, password: 'kembali-lagi-1' })).status, 404);
+});
+
+test('failed logins count atomically, and admin-key guesses are rate-limited', async () => {
+  const env = makeEnv();
+  await owner(env);
+  await Promise.all(Array.from({ length: 5 }, (_, i) => api(env, { action: 'authLogin', email: 'owner@contoh.id', password: `salah-${i}-paralel` })));
+  const locked = await api(env, { action: 'authLogin', email: 'owner@contoh.id', password: 'rahasia-panjang' });
+  assert.ok(!locked.token, 'five parallel guesses still lock the account');
+  assert.equal(env.DB.raw.prepare('SELECT locked_until IS NOT NULL AS l FROM users').get().l, 1);
+
+  const seen = [];
+  const limited = makeEnv({ AUTH_LIMITER: { limit: async ({ key }) => { seen.push(key); return { success: seen.length <= 2 }; } } });
+  assert.equal((await api(limited, { action: 'listForms', key: 'tebakan-1' })).status, 401);
+  assert.equal((await api(limited, { action: 'listForms', key: 'tebakan-2' })).status, 401);
+  assert.equal((await api(limited, { action: 'listForms', key: 'secret-key' })).status, 429);
+  assert.ok(seen.every((k) => k.startsWith('key:')));
+});
+
+test('only admins may change the GTM container', async () => {
+  const env = makeEnv();
+  const ownerToken = await owner(env);
+  const editor = await join(env, ownerToken, 'editor@contoh.id', 'editor');
+  const tracked = { ...form, tracking: { gtmId: '' } };
+  assert.equal((await api(env, { action: 'saveForm', token: editor.token, form: tracked })).ok, true);
+  const evil = { ...form, tracking: { gtmId: 'GTM-EVIL123' } };
+  assert.equal((await api(env, { action: 'saveForm', token: editor.token, form: evil })).status, 403);
+  assert.equal((await api(env, { action: 'saveForm', token: ownerToken, form: evil })).ok, true);
+  assert.equal((await api(env, { action: 'saveForm', token: editor.token, form: { ...evil, title: 'Kelas 2' } })).ok, true, 'editors can still save other changes');
+});
