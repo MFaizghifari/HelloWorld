@@ -3,7 +3,9 @@
  *
  * One registry spreadsheet stores form definitions; every form gets its own
  * spreadsheet with two tabs: "Responses" (one row per submission) and
- * "Events" (view / start / abandon / complete, used for funnel analytics).
+ * "Events" (view / start / abandon / partial / complete, used for funnel analytics)
+ * and, for forms with abandonment recovery on, "Belum selesai" (unfinished
+ * responses that already contain an email or phone number).
  *
  * Script Properties (Project Settings → Script properties):
  *   ADMIN_KEY          required. Secret used by the builder & dashboard.
@@ -318,6 +320,8 @@ function submit_(body) {
     lock.releaseLock();
   }
   ss.getSheetByName('Events').appendRow([now, cell_(meta.sessionId), 'complete', cell_((meta.path || []).join(','))]);
+  // The finished response replaces its unfinished copy.
+  try { deletePartial_(ss, String(meta.sessionId || '')); } catch (err) { console.error(err); }
 
   // Side effects never fail the submission.
   try { sideEffects_(form, responseId, now, answers, hidden, meta); } catch (err) { console.error(err); }
@@ -392,13 +396,112 @@ function capiRequest_(form, token, now, answers, hidden, meta) {
 // ─── Analytics events ───────────────────────────────────────────────────────
 function logEvent_(body) {
   var type = String(body.type || '');
-  if (['view', 'start', 'abandon'].indexOf(type) === -1) throw new Error('Event tidak valid.');
+  if (['view', 'start', 'abandon', 'partial'].indexOf(type) === -1) throw new Error('Event tidak valid.');
   var rec = getRecordCached_(body.formId);
   var path = (body.path || []).slice(0, 200).map(String).join(',');
+  var ss = SpreadsheetApp.openById(rec.sheetId);
   // appendRow is a single write; no lock needed for this append-only log.
-  SpreadsheetApp.openById(rec.sheetId).getSheetByName('Events')
-    .appendRow([new Date(), cell_(String(body.sessionId || '').slice(0, 40)), type, cell_(path)]);
+  ss.getSheetByName('Events').appendRow([new Date(), cell_(String(body.sessionId || '').slice(0, 40)), type, cell_(path)]);
+  if (type === 'abandon' || type === 'partial') upsertPartial_(ss, rec.form, body);
   return { ok: true };
+}
+
+// ─── Unfinished responses ("Belum selesai") ────────────────────────────────
+var PARTIAL_DAYS = 30;
+var PARTIAL_HEADERS = ['Updated At', 'Session ID', 'Nama', 'Email', 'Telepon', 'Berhenti di', 'Jumlah jawaban', 'utm_source', 'Answers (JSON)', 'Last question ID'];
+
+function partialsSheet_(ss) {
+  var sh = ss.getSheetByName('Belum selesai');
+  if (!sh) {
+    sh = ss.insertSheet('Belum selesai');
+    sh.appendRow(PARTIAL_HEADERS);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function findSessionRow_(sh, sessionId) {
+  var n = sh.getLastRow() - 1;
+  if (n < 1 || !sessionId) return -1;
+  var ids = sh.getRange(2, 2, n, 1).getValues();
+  for (var i = 0; i < ids.length; i++) if (ids[i][0] === sessionId) return i + 2;
+  return -1;
+}
+
+/** Same rules as app/js/logic.js contactFrom(): first valid email / phone, first short text as name. */
+function contactFrom_(form, answers) {
+  var c = { email: '', phone: '', name: '' };
+  (form.questions || []).forEach(function (q) {
+    var v = answers[q.id];
+    if (v === undefined || v === null || v === '') return;
+    var s = String(v).trim();
+    if (q.type === 'email' && !c.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s)) c.email = s;
+    var digits = s.replace(/\D/g, '');
+    if (q.type === 'phone' && !c.phone && digits.length >= 8 && digits.length <= 15) c.phone = s;
+    if (q.type === 'short_text' && !c.name) c.name = s.slice(0, 100);
+  });
+  return c.email || c.phone ? c : null;
+}
+
+function cleanPartialAnswers_(form, answers) {
+  var out = {};
+  (form.questions || []).forEach(function (q) {
+    var v = answers[q.id];
+    if (q.type === 'statement' || v === undefined || v === null || v === '') return;
+    if (Object.prototype.toString.call(v) === '[object Array]') out[q.id] = v.slice(0, 50).map(function (x) { return String(x).slice(0, 500); });
+    else out[q.id] = typeof v === 'number' ? v : String(v).slice(0, 2000);
+  });
+  return out;
+}
+
+function upsertPartial_(ss, form, body) {
+  if (!(form.recovery && form.recovery.partials) || !body.answers || typeof body.answers !== 'object') return;
+  var sessionId = String(body.sessionId || '');
+  if (!/^s_[a-z0-9]+$/.test(sessionId)) return;
+  var answers = cleanPartialAnswers_(form, body.answers);
+  var c = contactFrom_(form, answers);
+  if (!c) return;
+  var ids = (body.path || []).map(String);
+  var lastId = ids.length ? ids[ids.length - 1] : '';
+  var lastQ = (form.questions || []).filter(function (q) { return q.id === lastId; })[0];
+  var hidden = body.hidden || {};
+  var row = [new Date(), sessionId, cell_(c.name), cell_(c.email), cell_(c.phone), cell_(lastQ ? plainTitle_(lastQ.title) : ''),
+    Object.keys(answers).length, cell_(hidden.utm_source || ''), JSON.stringify(answers).slice(0, 45000), cell_(lastId)];
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = partialsSheet_(ss);
+    var at = findSessionRow_(sh, sessionId);
+    if (at === -1) sh.appendRow(row); else sh.getRange(at, 1, 1, row.length).setValues([row]);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deletePartial_(ss, sessionId) {
+  var sh = ss.getSheetByName('Belum selesai');
+  if (!sh || !sessionId) return;
+  var at = findSessionRow_(sh, sessionId);
+  if (at !== -1) sh.deleteRow(at);
+}
+
+function readPartials_(ss) {
+  var sh = ss.getSheetByName('Belum selesai');
+  if (!sh || sh.getLastRow() < 2) return [];
+  var cutoff = Date.now() - PARTIAL_DAYS * 86400000;
+  return sh.getRange(2, 1, sh.getLastRow() - 1, PARTIAL_HEADERS.length).getValues()
+    .filter(function (r) { return new Date(r[0]).getTime() >= cutoff; })
+    .map(function (r) {
+      var answers = {};
+      try { answers = JSON.parse(r[8] || '{}'); } catch (e) { /* truncated JSON: show contact only */ }
+      return {
+        sessionId: r[1], updatedAt: new Date(r[0]).toISOString(), answers: answers, hidden: { utm_source: uncell_(r[7]) },
+        contact: { name: uncell_(r[2]), email: uncell_(r[3]), phone: uncell_(r[4]) },
+        lastQuestion: uncell_(r[9]), lastQuestionTitle: uncell_(r[5]), answeredCount: r[6],
+      };
+    })
+    .sort(function (a, b) { return b.updatedAt.localeCompare(a.updatedAt); })
+    .slice(0, 500);
 }
 
 // ─── Dashboard data ─────────────────────────────────────────────────────────
@@ -438,12 +541,13 @@ function getResults_(formId, days) {
       events.push({ ts: ts.toISOString(), sessionId: uncell_(r[1]), type: r[2], path: String(uncell_(r[3]) || '').split(',').filter(String) });
     });
   }
-  return { ok: true, responses: responses, events: events, sheetUrl: ss.getUrl() };
+  return { ok: true, responses: responses, events: events, partials: readPartials_(ss), sheetUrl: ss.getUrl() };
 }
 
 /**
- * Optional maintenance: delete Events rows older than ~13 months to keep the
- * live file fast (Responses are never touched). Attach to a monthly time trigger.
+ * Optional maintenance, attach to a monthly time trigger: deletes Events rows
+ * older than ~13 months and "Belum selesai" rows older than 30 days.
+ * Responses are never touched.
  */
 function pruneOldEvents() {
   var keepDays = 400;
@@ -457,5 +561,12 @@ function pruneOldEvents() {
     var old = 0;
     while (old < n && new Date(ts[old][0]).getTime() < cutoff) old++;
     if (old > 0) ev.deleteRows(2, old);
+    // Unfinished responses are kept for 30 days at most (data minimisation).
+    var ps = SpreadsheetApp.openById(rec.sheetId).getSheetByName('Belum selesai');
+    if (!ps || ps.getLastRow() < 2) return;
+    var pts = ps.getRange(2, 1, ps.getLastRow() - 1, 1).getValues();
+    for (var i = pts.length - 1; i >= 0; i--) {
+      if (new Date(pts[i][0]).getTime() < Date.now() - PARTIAL_DAYS * 86400000) ps.deleteRow(i + 2);
+    }
   });
 }

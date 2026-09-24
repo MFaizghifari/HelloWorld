@@ -247,6 +247,56 @@ export function findLogicProblems(form) {
   return problems;
 }
 
+// ─── Partial responses (abandonment recovery) ───────────────────────────────
+export const DEFAULT_CONSENT_TEXT = 'Dengan mengisi kontak ini, Anda setuju dihubungi terkait form ini walaupun belum selesai mengisi.';
+export const PARTIAL_RETENTION_DAYS = 30;
+
+/** Whether this form keeps unfinished answers once contact details are known. */
+export function partialsEnabled(form) {
+  return !!form?.recovery?.partials;
+}
+
+/**
+ * Contact details found in the answers: the first valid email and phone
+ * answers, plus the first short-text answer as a probable name.
+ * Returns null when neither an email nor a phone number is present.
+ */
+export function contactFrom(form, answers = {}) {
+  let email = '';
+  let phone = '';
+  let name = '';
+  for (const q of form?.questions || []) {
+    const v = answers[q.id];
+    if (isEmpty(v)) continue;
+    if (q.type === 'email' && !email && !validateAnswer({ ...q, required: false }, v)) email = String(v).trim();
+    if (q.type === 'phone' && !phone && !validateAnswer({ ...q, required: false }, v)) phone = String(v).trim();
+    if (q.type === 'short_text' && !name) name = String(v).trim().slice(0, 100);
+  }
+  return email || phone ? { email, phone, name } : null;
+}
+
+/**
+ * Answers safe to store for an unfinished response: only real questions of
+ * this form, values that pass format validation, lengths capped.
+ */
+export function cleanPartialAnswers(form, answers = {}) {
+  const out = {};
+  for (const q of form?.questions || []) {
+    const v = answers[q.id];
+    if (q.type === 'statement' || isEmpty(v) || validateAnswer({ ...q, required: false }, v)) continue;
+    out[q.id] = Array.isArray(v) ? v.slice(0, 50).map((x) => String(x).slice(0, 500)) : typeof v === 'number' ? v : String(v).slice(0, 5000);
+  }
+  return out;
+}
+
+/** wa.me link for an answer like "+62 812-3456-7890" or "0812…" (Indonesian default). */
+export function whatsappLink(phone, text = '') {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('0')) d = `62${d.slice(1)}`;
+  if (d.length < 8) return '';
+  return `https://wa.me/${d}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+}
+
 /** Title for places where piping can't be resolved (lists, charts, sheet headers). */
 export function plainTitle(text) {
   return String(text || '').replace(/\{\{\s*[\w:-]+\s*\}\}/g, '…').replace(/\s+/g, ' ').trim();

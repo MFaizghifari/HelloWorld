@@ -1,7 +1,7 @@
 // FormFlow API on Cloudflare Workers + D1.
 // Speaks the same JSON protocol as apps-script/Code.gs, so the frontend
 // adapter is shared. Static files in ../app are served by Workers Assets.
-import { validateAnswer } from '../../app/js/logic.js';
+import { validateAnswer, partialsEnabled, contactFrom, cleanPartialAnswers, PARTIAL_RETENTION_DAYS } from '../../app/js/logic.js';
 import { answerIncrements, statsFromAggregates } from '../../app/js/stats.js';
 import { sendCapi } from './meta.js';
 import { hasGoogleCredentials, parseSheetId, writeHeader, appendRows } from './google.js';
@@ -117,7 +117,7 @@ async function listForms(env) {
 
 async function deleteForm(env, id) {
   validId(id);
-  await env.DB.batch(['forms', 'responses', 'sessions', 'daily', 'funnel', 'answer_counts'].map((t) =>
+  await env.DB.batch(['forms', 'responses', 'sessions', 'daily', 'funnel', 'answer_counts', 'partials'].map((t) =>
     env.DB.prepare(`DELETE FROM ${t} WHERE ${t === 'forms' ? 'id' : 'form_id'} = ?`).bind(id)));
   return { ok: true };
 }
@@ -162,9 +162,37 @@ async function applyPath(env, form, sessionId, rawPath, { complete = false, now 
   await env.DB.batch(stmts);
 }
 
+function cleanHidden(form, hidden) {
+  const keys = new Set([...AUTO_HIDDEN, ...(form.hiddenFields || [])]);
+  return Object.fromEntries(Object.entries(hidden || {}).filter(([k]) => keys.has(k)).map(([k, v]) => [k, String(v).slice(0, 500)]));
+}
+
+/**
+ * Keeps the unfinished answers of a session, only when the form opts in and a
+ * valid email/phone is present. Never overwrites a session that already submitted.
+ */
+async function upsertPartial(env, form, sessionId, body) {
+  if (!partialsEnabled(form) || !body.answers || typeof body.answers !== 'object') return false;
+  const answers = cleanPartialAnswers(form, body.answers);
+  const contact = contactFrom(form, answers);
+  if (!contact) return false;
+  const ids = new Set(form.questions.map((q) => q.id));
+  const path = (Array.isArray(body.path) ? body.path : []).map(String).filter((q) => ids.has(q));
+  const r = await env.DB.prepare(`
+    INSERT INTO partials (form_id, session_id, updated_at, answers, hidden, contact, last_question, answered_count)
+    SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+    WHERE NOT EXISTS (SELECT 1 FROM responses WHERE form_id = ?1 AND session_id = ?2)
+    ON CONFLICT(form_id, session_id) DO UPDATE SET updated_at = excluded.updated_at, answers = excluded.answers,
+      hidden = excluded.hidden, contact = excluded.contact, last_question = excluded.last_question, answered_count = excluded.answered_count`)
+    .bind(form.id, sessionId, new Date().toISOString(), JSON.stringify(answers), JSON.stringify(cleanHidden(form, body.hidden)),
+      JSON.stringify(contact), path[path.length - 1] || '', Object.keys(answers).length).run();
+  return r.meta.changes > 0;
+}
+
 async function logEvent(env, body) {
   const type = String(body.type || '');
-  if (!['view', 'start', 'abandon'].includes(type)) throw new HttpError(400, 'Event tidak valid.');
+  // 'partial' = progress saved right after contact details were entered.
+  if (!['view', 'start', 'abandon', 'partial'].includes(type)) throw new HttpError(400, 'Event tidak valid.');
   const sessionId = String(body.sessionId || '').slice(0, 40);
   if (!/^s_[a-z0-9]+$/.test(sessionId)) throw new HttpError(400, 'Session tidak valid.');
   const form = await loadForm(env, body.formId);
@@ -177,6 +205,7 @@ async function logEvent(env, body) {
     }
   } else {
     await applyPath(env, form, sessionId, body.path);
+    if (type === 'abandon' || type === 'partial') await upsertPartial(env, form, sessionId, body);
   }
   return { ok: true };
 }
@@ -196,8 +225,7 @@ async function submit(env, body, request, ctx) {
     if (err) throw new HttpError(422, `${q.title || k}: ${err}`);
     answers[k] = clean(v);
   }
-  const hiddenKeys = new Set([...AUTO_HIDDEN, ...(form.hiddenFields || [])]);
-  const hidden = Object.fromEntries(Object.entries(body.hidden || {}).filter(([k]) => hiddenKeys.has(k)).map(([k, v]) => [k, String(v).slice(0, 500)]));
+  const hidden = cleanHidden(form, body.hidden);
   const m = body.meta || {};
   const meta = Object.fromEntries(Object.entries({
     durationSec: Number(m.durationSec) || 0, pageUrl: m.pageUrl, referrer: m.referrer, sessionId: m.sessionId,
@@ -223,7 +251,11 @@ async function submit(env, body, request, ctx) {
       ON CONFLICT(form_id, day, question_id, value) DO UPDATE SET count = count + 1`).bind(form.id, day, qid, value));
   }
   await env.DB.batch(stmts);
-  if (sessionId) await applyPath(env, form, sessionId, m.path, { complete: true, now });
+  if (sessionId) {
+    await applyPath(env, form, sessionId, m.path, { complete: true, now });
+    // The finished response replaces its unfinished copy.
+    await env.DB.prepare('DELETE FROM partials WHERE form_id = ? AND session_id = ?').bind(form.id, sessionId).run();
+  }
 
   // Side effects run after the response is sent (ctx.waitUntil) — the respondent never waits on Meta or webhooks.
   const ip = request.headers.get('CF-Connecting-IP') || '';
@@ -251,13 +283,16 @@ async function getResults(env, formId, days) {
   days = Math.min(Math.max(Math.round(days) || 30, 1), 400);
   const today = new Date(Date.now() + tzOffsetMs(env));
   const since = new Date(today.getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
-  const [daily, funnel, counts, recent, total, fm] = await env.DB.batch([
+  const partialCutoff = new Date(Date.now() - PARTIAL_RETENTION_DAYS * 86_400_000).toISOString();
+  const [daily, funnel, counts, recent, total, fm, partials] = await env.DB.batch([
     env.DB.prepare('SELECT day, views, starts, completions FROM daily WHERE form_id = ? AND day >= ?').bind(form.id, since),
     env.DB.prepare('SELECT question_id, SUM(reached) AS reached, SUM(dropped) AS dropped FROM funnel WHERE form_id = ? AND day >= ? GROUP BY question_id').bind(form.id, since),
     env.DB.prepare('SELECT question_id, value, SUM(count) AS count FROM answer_counts WHERE form_id = ? AND day >= ? GROUP BY question_id, value').bind(form.id, since),
     env.DB.prepare('SELECT id, submitted_at, answers, hidden, meta FROM responses WHERE form_id = ? ORDER BY submitted_at DESC LIMIT 100').bind(form.id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM responses WHERE form_id = ?').bind(form.id),
     env.DB.prepare('SELECT sheet_id, sheet_status FROM forms WHERE id = ?').bind(form.id),
+    env.DB.prepare(`SELECT session_id, updated_at, answers, hidden, contact, last_question, answered_count FROM partials
+      WHERE form_id = ? AND updated_at >= ? ORDER BY updated_at DESC LIMIT 500`).bind(form.id, partialCutoff),
   ]);
   const recentParsed = recent.results.map(parseResponse);
   const stats = statsFromAggregates(form, { daily: daily.results, funnel: funnel.results, counts: counts.results, recent: recentParsed }, { days, today });
@@ -267,6 +302,10 @@ async function getResults(env, formId, days) {
     stats,
     responses: recentParsed, // newest first, max 100
     totalResponses: total.results[0].n,
+    partials: partials.results.map((p) => ({
+      sessionId: p.session_id, updatedAt: p.updated_at, answers: JSON.parse(p.answers), hidden: JSON.parse(p.hidden),
+      contact: JSON.parse(p.contact), lastQuestion: p.last_question, answeredCount: p.answered_count,
+    })),
     sheetUrl: f.sheet_id ? `https://docs.google.com/spreadsheets/d/${f.sheet_id}/edit` : '',
     sheetStatus: f.sheet_status || '',
   };
@@ -342,6 +381,13 @@ export async function syncSheets(env, { fetchImpl = fetch, batchSize = 500 } = {
   return { ok: true, synced };
 }
 
+/** Data minimisation: unfinished answers are kept for 30 days at most. */
+export async function purgeOldPartials(env) {
+  const cutoff = new Date(Date.now() - PARTIAL_RETENTION_DAYS * 86_400_000).toISOString();
+  const r = await env.DB.prepare('DELETE FROM partials WHERE updated_at < ?').bind(cutoff).run();
+  return r.meta.changes;
+}
+
 // ─── Router ─────────────────────────────────────────────────────────────────
 async function rateLimited(env, request, action) {
   if (!env.SUBMIT_LIMITER || (action !== 'submit' && action !== 'event')) return false;
@@ -404,7 +450,7 @@ export default {
     return new Response('Not found', { status: 404 });
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(syncSheets(env));
+    ctx.waitUntil(Promise.all([syncSheets(env), purgeOldPartials(env)]));
   },
 };
 

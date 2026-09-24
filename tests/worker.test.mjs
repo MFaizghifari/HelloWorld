@@ -2,17 +2,18 @@
 // like Cloudflare D1, with the real migration applied.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { generateKeyPairSync, createHash } from 'node:crypto';
-import worker, { syncSheets, sheetColumns } from '../worker/src/index.js';
+import worker, { syncSheets, sheetColumns, purgeOldPartials } from '../worker/src/index.js';
 import { computeStats } from '../app/js/stats.js';
 import { nextQuestionId, END } from '../app/js/logic.js';
 
 // ─── Minimal D1 shim ────────────────────────────────────────────────────────
 function d1() {
   const db = new DatabaseSync(':memory:');
-  db.exec(readFileSync(new URL('../worker/migrations/0001_init.sql', import.meta.url), 'utf8'));
+  const dir = new URL('../worker/migrations/', import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) db.exec(readFileSync(new URL(f, dir), 'utf8'));
   const stmt = (sql, params = []) => ({
     bind: (...p) => stmt(sql, p),
     first: async () => db.prepare(sql).get(...params) ?? null,
@@ -249,4 +250,48 @@ test('worker serves config script and falls back to assets', async () => {
   assert.equal(await page.text(), 'asset');
   const bad = await api(env, { action: 'event', formId: 'f_nope01', type: 'view', sessionId: 's_x' });
   assert.equal(bad.status, 404);
+});
+
+test('partial responses: opt-in, needs valid contact, sanitised, replaced by submit, purged after 30 days', async () => {
+  const env = makeEnv();
+  const f = { ...structuredClone(form), integrations: {}, recovery: { partials: false } };
+  await api(env, { action: 'saveForm', key: 'secret-key', form: f });
+  const partial = (sessionId, answers, type = 'partial') => api(env, { action: 'event', formId: f.id, type, sessionId, path: Object.keys(answers), answers, hidden: { utm_source: 'fb', evil: 'x' } });
+  const count = () => env.DB.raw.prepare('SELECT COUNT(*) n FROM partials').get().n;
+
+  await partial('s_p1', { q_name: 'Faiz', q_mail: 'faiz@mail.com' });
+  assert.equal(count(), 0, 'feature off: nothing stored');
+
+  f.recovery = { partials: true };
+  await api(env, { action: 'saveForm', key: 'secret-key', form: f });
+  await partial('s_p1', { q_name: 'Faiz' });
+  assert.equal(count(), 0, 'no contact yet: nothing stored');
+  await partial('s_p1', { q_name: 'Faiz', q_mail: 'not-an-email' });
+  assert.equal(count(), 0, 'invalid email is not a contact');
+
+  await partial('s_p1', { q_name: 'Faiz', q_mail: 'faiz@mail.com', q_bogus: 'x' });
+  await partial('s_p1', { q_name: 'Faiz', q_mail: 'faiz@mail.com', q_phone: '0812-3456-7890' }, 'abandon');
+  await partial('s_p2', { q_name: 'Ana', q_phone: '+62 811 2222 3333' }, 'abandon');
+  assert.equal(count(), 2, 'upserted per session');
+  const row = env.DB.raw.prepare("SELECT * FROM partials WHERE session_id = 's_p1'").get();
+  assert.deepEqual(Object.keys(JSON.parse(row.answers)).sort(), ['q_mail', 'q_name', 'q_phone'], 'unknown question dropped');
+  assert.deepEqual(JSON.parse(row.hidden), { utm_source: 'fb' }, 'unknown hidden field dropped');
+  assert.deepEqual(JSON.parse(row.contact), { email: 'faiz@mail.com', phone: '0812-3456-7890', name: 'Faiz' });
+  assert.equal(row.last_question, 'q_phone');
+
+  // Funnel still counts partial/abandon progress exactly once.
+  const res = await api(env, { action: 'getResults', key: 'secret-key', formId: f.id, days: 7 });
+  assert.equal(res.partials.length, 2);
+  assert.equal(res.partials[0].contact.name, 'Ana', 'newest first');
+  assert.equal(res.stats.funnel.find((x) => x.id === 'q_name').reached, 2);
+
+  // Submitting replaces the unfinished copy, and a late beacon cannot bring it back.
+  await api(env, { action: 'submit', formId: f.id, answers: { q_name: 'Faiz', q_mail: 'faiz@mail.com' }, meta: { sessionId: 's_p1', path: ['q_name', 'q_mail'] } });
+  assert.equal(count(), 1);
+  await partial('s_p1', { q_name: 'Faiz', q_mail: 'faiz@mail.com' }, 'abandon');
+  assert.equal(count(), 1, 'no partial for a submitted session');
+
+  env.DB.raw.prepare("UPDATE partials SET updated_at = '2020-01-01T00:00:00.000Z'").run();
+  assert.equal(await purgeOldPartials(env), 1);
+  assert.equal(count(), 0);
 });

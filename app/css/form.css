@@ -157,6 +157,10 @@
 .ff-btn:hover { filter: brightness(1.1); }
 .ff-btn:active { filter: brightness(.92); }
 .ff-hint { font-size: 12px; color: var(--ff-q-70); }
+.ff-btn-ghost { background: transparent; color: var(--ff-btn); box-shadow: inset 0 0 0 1px var(--ff-a-60); }
+.ff-consent { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; max-width: 560px; font-size: 13px; line-height: 1.45; color: var(--ff-q-50); }
+.ff-consent .ico { margin-top: 2px; }
+.ff-resume .ff-actions { flex-wrap: wrap; }
 .ff-hint strong { font-weight: 700; }
 .ff-error {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 5px 10px; border-radius: 4px;

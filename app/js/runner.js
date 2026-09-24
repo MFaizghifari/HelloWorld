@@ -4,11 +4,14 @@
 // builder's in-app preview, so both behave identically.
 import { el } from './dom.js';
 import { icon } from './icons.js';
-import { END, firstQuestionId, nextQuestionId, validateAnswer, progress, uid, interpolate } from './logic.js';
+import {
+  END, firstQuestionId, nextQuestionId, validateAnswer, progress, uid, interpolate, partialsEnabled, contactFrom, DEFAULT_CONSENT_TEXT,
+} from './logic.js';
 import { applyTheme, welcomeScreen, questionScreen, thankYouScreen } from './renderer.js';
 import { createTracker, newEventId, fbIdentifiers } from './tracking.js';
 
 const AUTO_HIDDEN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
+const RESUME_DAYS = 7;
 
 /**
  * @param {HTMLElement} host   element the form fills
@@ -45,8 +48,56 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     startedAt: Date.now(),
     submitting: false,
     abandonSentLen: 0,
+    contactCaptured: false,
     destroyed: false,
   };
+
+  // ─── Abandonment recovery ─────────────────────────────────────────────────
+  const recovery = form.recovery || {};
+  const savePartials = !preview && partialsEnabled(form);
+  const consentText = partialsEnabled(form) ? (recovery.consentText || DEFAULT_CONSENT_TEXT) : '';
+  const resumeOn = !preview && !!recovery.resume;
+  const resumeKey = `ff_progress_${form.id}`;
+
+  const answersOnPath = () => {
+    const onPath = new Set(state.history);
+    return Object.fromEntries(Object.entries(state.answers).filter(([k]) => onPath.has(k)));
+  };
+
+  function saveProgress() {
+    if (!resumeOn || state.finished) return;
+    try {
+      localStorage.setItem(resumeKey, JSON.stringify({
+        savedAt: Date.now(), sessionId: state.sessionId, answers: state.answers, history: state.history, currentId: state.currentId, hidden: state.hidden,
+      }));
+    } catch { /* storage unavailable: resume simply won't be offered */ }
+  }
+
+  function clearProgress() {
+    try { localStorage.removeItem(resumeKey); } catch { /* ignore */ }
+  }
+
+  /** Saved progress on this device, if it still matches the form. */
+  function loadProgress() {
+    if (!resumeOn) return null;
+    try {
+      const p = JSON.parse(localStorage.getItem(resumeKey) || 'null');
+      const ids = new Set(form.questions.map((q) => q.id));
+      if (!p || Date.now() - p.savedAt > RESUME_DAYS * 86400000 || !p.history?.length) return null;
+      if (!ids.has(p.currentId) || !p.history.every((id) => ids.has(id)) || !/^s_[a-z0-9]+$/.test(p.sessionId || '')) return null;
+      return p;
+    } catch { return null; }
+  }
+
+  /** First time a valid email or phone appears: Pixel event + (if enabled) store the unfinished answers. */
+  function onContactMaybe() {
+    if (state.contactCaptured || !contactFrom(form, state.answers)) return;
+    state.contactCaptured = true;
+    state.tracker?.contact();
+    if (savePartials) {
+      backend.logEvent(form.id, { type: 'partial', sessionId: state.sessionId, path: [...state.history], answers: answersOnPath(), hidden: state.hidden });
+    }
+  }
 
   const questionById = (id) => form.questions.find((q) => q.id === id);
 
@@ -79,11 +130,12 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
   function go(id, dir = 'up') {
     state.currentId = id;
     nav.hidden = false;
+    saveProgress();
     const q = questionById(id);
     const value = state.answers[q.id];
     const isLast = nextQuestionId(form, q.id, { ...state.answers, [q.id]: value }) === END;
     const screen = questionScreen(form, q, {
-      mode: 'live', answers: state.answers, hidden: state.hidden, value, isLast,
+      mode: 'live', answers: state.answers, hidden: state.hidden, value, isLast, consent: consentText,
       onSubmit: (val, api) => commit(q, val, api),
     });
     // Honeypot for bots: hidden from humans and assistive tech.
@@ -107,6 +159,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
       if (!preview) backend.logEvent(form.id, { type: 'start', sessionId: state.sessionId, path: [q.id] });
     }
     state.history.push(q.id);
+    onContactMaybe();
     const next = nextQuestionId(form, q.id, state.answers);
     if (next === END) finish(api);
     else go(next, 'up');
@@ -153,6 +206,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     try {
       if (!preview) await backend.submit(form.id, payload);
       state.finished = true;
+      clearProgress();
       state.tracker?.submit(eventId);
       nav.hidden = true;
       state.currentId = END;
@@ -184,12 +238,52 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
     // Mobile users often switch tabs and come back; only resend when they progressed.
     if (path.length <= state.abandonSentLen) return;
     state.abandonSentLen = path.length;
-    backend.logEvent(form.id, { type: 'abandon', sessionId: state.sessionId, path }, { beacon: true });
+    const extra = savePartials && state.contactCaptured ? { answers: answersOnPath(), hidden: state.hidden } : {};
+    backend.logEvent(form.id, { type: 'abandon', sessionId: state.sessionId, path, ...extra }, { beacon: true });
   }
   const onVisibility = () => { if (document.visibilityState === 'hidden') sendAbandon(); };
 
+  function resumeScreen(saved) {
+    const cont = () => {
+      Object.assign(state, {
+        answers: saved.answers || {}, history: [...saved.history], hidden: { ...saved.hidden, ...state.hidden }, started: true,
+        contactCaptured: !!contactFrom(form, saved.answers || {}),
+      });
+      go(saved.currentId);
+    };
+    const restart = () => {
+      clearProgress();
+      state.sessionId = uid('s'); // a fresh visit, counted as a new session
+      if (!preview) backend.logEvent(form.id, { type: 'view', sessionId: state.sessionId, path: [] });
+      startFresh();
+    };
+    const name = contactFrom(form, saved.answers || {})?.name;
+    const n = saved.history.length;
+    return {
+      el: el('section', { class: 'ff-screen ff-welcome ff-resume' },
+        el('h1', { class: 'ff-title ff-title-xl', text: name ? `Selamat datang kembali, ${name}!` : 'Selamat datang kembali!' }),
+        el('p', { class: 'ff-desc', text: `Anda sudah menjawab ${n} pertanyaan. Mau lanjut dari yang terakhir?` }),
+        el('div', { class: 'ff-actions' },
+          el('button', { class: 'ff-btn', type: 'button', onclick: cont }, el('span', { text: 'Lanjutkan' })),
+          el('button', { class: 'ff-btn ff-btn-ghost', type: 'button', onclick: restart }, el('span', { text: 'Mulai dari awal' })))),
+      focus: () => {},
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); cont(); return true; } return false; },
+    };
+  }
+
+  function startFresh() {
+    if (form.welcome?.enabled !== false) {
+      show(welcomeScreen(form, { mode: 'live', answers: {}, hidden: state.hidden, start: () => go(firstQuestionId(form)) }));
+    } else {
+      go(firstQuestionId(form));
+    }
+  }
+
   // ─── Start ────────────────────────────────────────────────────────────────
   applyTheme(root, form.theme);
+  const saved = form.questions?.length ? loadProgress() : null;
+  // Resuming continues the same session, so the funnel counts this visitor once.
+  if (saved) state.sessionId = saved.sessionId;
   for (const k of new Set([...AUTO_HIDDEN, ...(form.hiddenFields || [])])) {
     const v = params.get(k);
     if (v) state.hidden[k] = v.slice(0, 500);
@@ -209,10 +303,10 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
 
   if (!form.questions?.length) {
     stage.replaceChildren(el('section', { class: 'ff-screen ff-ending' }, el('h1', { class: 'ff-title ff-title-xl', text: 'Belum ada pertanyaan' }), el('p', { class: 'ff-desc', text: 'Tambahkan pertanyaan dulu di builder.' })));
-  } else if (form.welcome?.enabled !== false) {
-    show(welcomeScreen(form, { mode: 'live', answers: {}, hidden: state.hidden, start: () => go(firstQuestionId(form)) }));
+  } else if (saved) {
+    show(resumeScreen(saved));
   } else {
-    go(firstQuestionId(form));
+    startFresh();
   }
 
   return {

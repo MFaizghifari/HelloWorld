@@ -257,6 +257,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 .res-range { width: auto; }
 .demo-note { background: #FFF4CC; margin: 0; }
 
+.card-span { grid-column: 1 / -1; }
+.recovery-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+.retarget { background: var(--surface); border-radius: 12px; padding: 14px 16px; }
+.retarget h4 { margin: 0 0 6px; font-size: .9rem; }
+.contact-cell { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.btn-wa { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 9999px; background: #E7F8EE; color: #0B6B3A; font-size: .8rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.btn-wa:hover { background: #D2F2DF; }
+@media (max-width: 860px) { .recovery-grid { grid-template-columns: minmax(0, 1fr); } }
+
 /* Dashboard shell */
 .panel { padding: 24px; max-width: 1200px; margin: 0 auto; }
 

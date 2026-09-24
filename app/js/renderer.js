@@ -559,7 +559,7 @@ export function thankYouScreen(form, ctx) {
 }
 
 /**
- * ctx (live): { mode: 'live', answers, hidden, value, isLast, onSubmit(value) }
+ * ctx (live): { mode: 'live', answers, hidden, value, isLast, consent?, onSubmit(value) }
  * ctx (edit): { mode: 'edit', recall: [{token,label,kind}], onEdit(opts?) } — edits mutate the form in place
  */
 export function questionScreen(form, q, ctx) {
@@ -601,6 +601,10 @@ export function questionScreen(form, q, ctx) {
     text(ctx, q.description, { tag: 'p', className: 'ff-desc', placeholder: 'Deskripsi (opsional)', multiline: true, onChange: (v) => { q.description = v; ctx.onEdit(); } }),
     layout === 'stack' ? el('img', { class: 'ff-q-img', src: q.imageUrl, alt: '' }) : null,
     input.el ? el('div', { class: 'ff-input' }, input.el) : null,
+    // Shown when the form keeps unfinished answers (UU PDP: say why contact data is kept).
+    ctx.consent && (q.type === 'email' || q.type === 'phone')
+      ? el('p', { class: 'ff-consent' }, icon('lock', { size: 14 }), el('span', { text: ctx.consent }))
+      : null,
     errorBox,
     actions);
 

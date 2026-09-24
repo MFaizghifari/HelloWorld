@@ -1,7 +1,7 @@
 // Backend adapters. Both expose the same async interface so the UI never
 // cares where data lives.
 import { getConfig, getAdminKey } from './config.js';
-import { uid } from './logic.js';
+import { uid, partialsEnabled, contactFrom, cleanPartialAnswers, PARTIAL_RETENTION_DAYS } from './logic.js';
 
 // ─── Local (browser storage) — for demos and offline design work ───────────
 const LS = {
@@ -38,30 +38,56 @@ const localBackend = {
     const forms = LS.read('tf_forms', {});
     delete forms[id];
     LS.write('tf_forms', forms);
-    try { localStorage.removeItem(`tf_resp_${id}`); localStorage.removeItem(`tf_evt_${id}`); } catch { /* storage unavailable */ }
+    try { ['resp', 'evt', 'part'].forEach((k) => localStorage.removeItem(`tf_${k}_${id}`)); } catch { /* storage unavailable */ }
   },
   async submit(formId, payload) {
     const list = LS.read(`tf_resp_${formId}`, []);
     const responseId = uid('r');
     list.push({ ...payload, responseId, submittedAt: new Date().toISOString() });
     LS.write(`tf_resp_${formId}`, list);
+    // A finished response replaces its unfinished copy.
+    const sid = payload.meta?.sessionId;
+    const parts = LS.read(`tf_part_${formId}`, {});
+    if (sid && parts[sid]) { delete parts[sid]; LS.write(`tf_part_${formId}`, parts); }
     // The Apps Script backend records this server-side to save a request.
     await this.logEvent(formId, { type: 'complete', sessionId: payload.meta?.sessionId, path: payload.meta?.path || [] });
     return { responseId };
   },
   async logEvent(formId, event) {
+    const { answers, hidden, ...evt } = event;
     const list = LS.read(`tf_evt_${formId}`, []);
-    list.push({ ...event, ts: new Date().toISOString() });
+    list.push({ ...evt, ts: new Date().toISOString() });
     LS.write(`tf_evt_${formId}`, list.slice(-50000));
+    if (answers) savePartialLocal(formId, event);
   },
   async getResults(formId) {
+    const cutoff = Date.now() - PARTIAL_RETENTION_DAYS * 86400000;
+    const partials = Object.values(LS.read(`tf_part_${formId}`, {}))
+      .filter((p) => new Date(p.updatedAt).getTime() >= cutoff)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return {
       responses: LS.read(`tf_resp_${formId}`, []),
       events: LS.read(`tf_evt_${formId}`, []),
+      partials,
       sheetUrl: '',
     };
   },
 };
+
+/** Same rules as the servers: only when the form opts in and a valid contact is known. */
+function savePartialLocal(formId, { sessionId, answers, hidden = {}, path = [] }) {
+  const form = LS.read('tf_forms', {})[formId];
+  if (!form || !partialsEnabled(form) || !sessionId) return;
+  const clean = cleanPartialAnswers(form, answers);
+  const contact = contactFrom(form, clean);
+  if (!contact) return;
+  const parts = LS.read(`tf_part_${formId}`, {});
+  parts[sessionId] = {
+    sessionId, updatedAt: new Date().toISOString(), answers: clean, hidden, contact,
+    lastQuestion: path[path.length - 1] || '', answeredCount: Object.keys(clean).length,
+  };
+  LS.write(`tf_part_${formId}`, parts);
+}
 
 // ─── Remote backends (Google Apps Script, Cloudflare Worker) ───────────────
 // Both speak the same JSON protocol. POST bodies are sent as text/plain to
@@ -132,7 +158,7 @@ function httpBackend(url, name) {
      */
     async getResults(formId, days = 30) {
       const d = await call('getResults', { formId, days }, { admin: true });
-      return { responses: d.responses, events: d.events || [], stats: d.stats || null, totalResponses: d.totalResponses, sheetUrl: d.sheetUrl, sheetStatus: d.sheetStatus || '' };
+      return { responses: d.responses, events: d.events || [], partials: d.partials || [], stats: d.stats || null, totalResponses: d.totalResponses, sheetUrl: d.sheetUrl, sheetStatus: d.sheetStatus || '' };
     },
     ...(name === 'cloud' ? {
       async exportAll(formId, onProgress) {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   END, nextQuestionId, validateAnswer, evaluateCondition, interpolate, estimatePath, progress, findLogicProblems,
+  contactFrom, whatsappLink, cleanPartialAnswers,
 } from '../app/js/logic.js';
 
 const form = {
@@ -81,4 +82,15 @@ test('progress follows logic path and survives cycles', () => {
   const loop = { questions: [{ id: 'a', next: 'b' }, { id: 'b', next: 'a' }] };
   assert.deepEqual(estimatePath(loop, 'a', {}), ['a', 'b']);
   assert.ok(findLogicProblems({ questions: [{ id: 'a', logic: [{ goto: 'a', conditions: [] }] }] }).length);
+});
+
+test('contact detection and WhatsApp links for follow-up', () => {
+  const f = { questions: [{ id: 'n', type: 'short_text' }, { id: 'e', type: 'email' }, { id: 'p', type: 'phone' }, { id: 'c', type: 'multiple_choice', options: [{ label: 'A' }] }] };
+  assert.equal(contactFrom(f, { n: 'Faiz' }), null);
+  assert.equal(contactFrom(f, { n: 'Faiz', e: 'nope' }), null);
+  assert.deepEqual(contactFrom(f, { n: 'Faiz', p: '0812 3456 7890' }), { email: '', phone: '0812 3456 7890', name: 'Faiz' });
+  assert.equal(whatsappLink('0812-3456-7890'), 'https://wa.me/6281234567890');
+  assert.equal(whatsappLink('+62 812 3456 7890', 'Halo Faiz'), 'https://wa.me/6281234567890?text=Halo%20Faiz');
+  assert.equal(whatsappLink('123'), '');
+  assert.deepEqual(cleanPartialAnswers(f, { n: 'Faiz', e: 'bad', c: 'Z', x: 1 }), { n: 'Faiz' });
 });

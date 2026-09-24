@@ -174,3 +174,28 @@ test('admin gate, save, submit, results, CAPI & webhook', () => {
 
   assert.equal(env.post({ action: 'listForms', key }).forms.length, 1);
 });
+
+test('Apps Script: unfinished responses go to "Belum selesai" and are removed on submit', () => {
+  const env = makeEnv();
+  env.ctx.setup();
+  const key = env.props.ADMIN_KEY;
+  const f = { ...JSON.parse(JSON.stringify(form)), id: 'f_part01', title: 'Partial', recovery: { partials: true } };
+  assert.equal(env.post({ action: 'saveForm', key, form: f }).ok, true);
+  const ss = Object.values(env.files).find((x) => x.title === 'FormFlow — Partial');
+
+  env.post({ action: 'event', formId: f.id, type: 'partial', sessionId: 's_a1', path: ['q_name1', 'q_mail1'], answers: { q_name1: '=Faiz', q_mail1: 'faiz@mail.com' }, hidden: { utm_source: 'ig' } });
+  env.post({ action: 'event', formId: f.id, type: 'abandon', sessionId: 's_a1', path: ['q_name1', 'q_mail1', 'q_phon1'], answers: { q_name1: '=Faiz', q_mail1: 'faiz@mail.com', q_phon1: '0812 3456 7890' } });
+  env.post({ action: 'event', formId: f.id, type: 'partial', sessionId: 's_a2', path: ['q_name1'], answers: { q_name1: 'No contact' } });
+  const sh = ss.getSheetByName('Belum selesai');
+  assert.equal(sh.getLastRow(), 2, 'one row per session, only with a contact');
+  assert.equal(sh.data[1][2], "'=Faiz", 'formula injection neutralised');
+  assert.equal(sh.data[1][4], '0812 3456 7890', 'updated in place by the later event');
+
+  const res = env.post({ action: 'getResults', key, formId: f.id, days: 30 });
+  assert.equal(res.partials.length, 1);
+  assert.equal(res.partials[0].contact.email, 'faiz@mail.com');
+  assert.equal(res.partials[0].lastQuestion, 'q_phon1');
+
+  env.post({ action: 'submit', formId: f.id, answers: { q_name1: 'Faiz' }, meta: { sessionId: 's_a1', path: ['q_name1'] } });
+  assert.equal(sh.getLastRow(), 1, 'deleted after submit');
+});

@@ -36,6 +36,7 @@ tests/               node --test (logic, stats, Apps Script mock, Worker di atas
 | **Dashboard** | Views, mulai, submission, completion rate, median waktu isi, tren harian, funnel drop-off per pertanyaan, sumber traffic, distribusi jawaban, NPS, tabel jawaban, ekspor CSV |
 | **Google Sheets** | Satu spreadsheet per form (tab `Responses` + `Events`), bisa otomatis dibagikan ke email tim, kolom tetap sinkron walau pertanyaan diganti judul/urutan |
 | **Integrasi** | Webhook (Make/Zapier/n8n/CRM), email notifikasi |
+| **Pemulihan jawaban** | Simpan jawaban yang belum selesai setelah kontak terisi, lanjutkan dari pertanyaan terakhir, event Pixel `FormContact` untuk retargeting, daftar "Belum selesai" dengan tombol WA |
 | **Keamanan** | Admin key untuk builder/dashboard, pencegahan formula injection di Sheets & CSV, honeypot anti-bot, ID Pixel/GA4/GTM divalidasi ketat sebelum dipasang, semua teks form dirender via `textContent` (tanpa `innerHTML`) |
 
 ## Coba lokal (5 menit, tanpa Google)
@@ -122,6 +123,22 @@ Script Properties opsional:
 
 > Setiap kali `Code.gs` diubah, buat **versi deployment baru** (Manage deployments → Edit → New version) agar URL yang sama memakai kode terbaru.
 
+## Pemulihan jawaban yang belum selesai
+
+Menurut benchmark Zuko, rata-rata **1 dari 3 orang yang mulai mengisi form berhenti di tengah** (66% starter → selesai), dan kolom **email (6,4%) dan telepon (6,3%)** termasuk yang paling sering jadi titik berhenti ([Zuko](https://www.zuko.io/blog/8-surprising-insights-from-zukos-benchmarking-data)). Ada tiga fitur untuk menyelamatkan mereka, dan semuanya diatur di tab **Integrasi → Pemulihan jawaban yang belum selesai**:
+
+| Fitur | Cara kerja |
+|---|---|
+| **Simpan jawaban yang belum selesai** (aktif untuk form baru) | Begitu email atau nomor telepon yang valid terisi, jawaban sejauh itu disimpan di server, lalu diperbarui saat responden meninggalkan halaman. Muncul di tab **Hasil → Belum selesai** (nama, kontak, pertanyaan tempat berhenti, sumber, tombol **Chat WA**, ekspor CSV). Disimpan di tabel D1 `partials`, di tab *Belum selesai* Google Sheet (Apps Script), atau di browser (mode lokal) |
+| **Lanjutkan dari pertanyaan terakhir** (nonaktif default) | Progres disimpan di browser responden selama 7 hari. Saat kembali, muncul layar "Selamat datang kembali, Faiz! Lanjutkan?". Sesi yang sama dilanjutkan, jadi funnel tetap menghitung 1 pengunjung. Jangan diaktifkan untuk form yang diisi di komputer bersama |
+| **Event Pixel `FormContact`** | Terkirim saat kontak pertama kali terisi, sebagai dasar audiens retargeting *FormContact tanpa Lead*. Langkah pembuatan audiensnya ada di tab Integrasi |
+
+**Privasi (UU PDP, UU 27/2022):** kalimat persetujuan tampil di bawah kolom email/telepon dan bisa diedit. Data belum selesai **dihapus begitu orang yang sama submit** (jawaban lengkap menggantikannya) dan **dihapus otomatis setelah 30 hari**: di Cloudflare lewat cron, di Apps Script lewat `pruneOldEvents()`. Server hanya menyimpan pertanyaan milik form itu dengan format valid, dan hanya jika form mengaktifkan fiturnya. Pengaturan dari browser tidak bisa memaksanya.
+
+**Biaya tambahan:** satu request per pengunjung yang mengisi kontak (event `partial`). Event `abandon` yang sudah ada ikut membawa jawaban, jadi tidak ada request tambahan untuk itu. Tiap event menulis 1 baris `partials` (upsert per sesi).
+
+**Deployment yang sudah berjalan:** jalankan `npm run db:migrate` di folder `worker/` untuk membuat tabel `partials` (`migrations/0002_partials.sql`), lalu `npm run deploy`.
+
 ## Embed di website
 
 Tab **Bagikan** menghasilkan 3 snippet. Disarankan memakai `embed.js`:
@@ -184,8 +201,9 @@ npm test
   - admin key, validasi, submit idempoten, payload CAPI (IP + hash SHA-256)
   - **300 sesi simulasi** (bounce, berhenti di tengah, beacon abandon berulang, logic jump, multi-pilihan): statistik dari tabel agregat D1 **identik** dengan statistik yang dihitung ulang dari data mentah
   - ekspor berhalaman tanpa duplikat, sinkron Google Sheets (JWT asli, RAW, retry setelah 403, posisi kolom stabil)
+  - jawaban belum selesai: hanya jika fitur aktif dan kontak valid, dibersihkan dari pertanyaan/parameter asing, diperbarui per sesi, dihapus saat submit (beacon terlambat tidak menghidupkannya lagi), dihapus setelah 30 hari
 
-Selain itu, alur builder → form → dashboard → ekspor CSV sudah diuji end-to-end dengan Playwright di runtime Cloudflare lokal (`wrangler dev`).
+Selain itu, alur builder → form → dashboard → ekspor CSV dan alur pemulihan (isi kontak → tutup tab → muncul di "Belum selesai" → kembali → lanjutkan → submit → hilang dari daftar) sudah diuji end-to-end dengan Playwright, baik di mode lokal maupun di runtime Cloudflare lokal (`wrangler dev` + D1).
 
 ## Keterbatasan saat ini
 

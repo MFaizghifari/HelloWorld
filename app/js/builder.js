@@ -4,7 +4,9 @@ import { getBackend } from './api.js';
 import { DEFAULT_CONFIG, getConfig, saveConfig, getAdminKey, setAdminKey, serverConfig } from './config.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
-import { END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle, nextQuestionId } from './logic.js';
+import {
+  END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle, nextQuestionId, partialsEnabled, DEFAULT_CONSENT_TEXT, PARTIAL_RETENTION_DAYS,
+} from './logic.js';
 import {
   applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen,
 } from './renderer.js';
@@ -90,6 +92,7 @@ function blankForm() {
     hiddenFields: ['utm_source', 'utm_campaign'],
     tracking: { fbPixelId: '', fbSubmitEvent: 'Lead', stepEvents: false, capi: false, ga4Id: '', gtmId: '' },
     integrations: { webhookUrl: '', notifyEmail: '' },
+    recovery: { partials: true, consentText: DEFAULT_CONSENT_TEXT, resume: false },
     createdAt: new Date().toISOString(),
   };
 }
@@ -397,7 +400,10 @@ function renderCanvas() {
   else if (state.selected === 'ending') screen = thankYouScreen(f, { ...ctx, recall: recallOptions(null) });
   else {
     const q = f.questions.find((x) => x.id === state.selected);
-    screen = questionScreen(f, q, { ...ctx, recall: recallOptions(q), isLast: nextQuestionId(f, q.id, {}) === END });
+    screen = questionScreen(f, q, {
+      ...ctx, recall: recallOptions(q), isLast: nextQuestionId(f, q.id, {}) === END,
+      consent: partialsEnabled(f) ? (f.recovery.consentText || DEFAULT_CONSENT_TEXT) : '',
+    });
   }
   stage.append(screen.el);
   root.append(stage);
@@ -680,7 +686,36 @@ function renderConnect() {
       el('section', { class: 'card' },
         el('h3', { text: 'Webhook' }),
         field('Webhook URL (opsional)', bind(ig, 'webhookUrl', { type: 'url' }), 'Setiap jawaban baru di-POST (JSON) ke URL ini dari server: Make, Zapier, n8n, CRM, atau notifikasi Slack/Telegram.')),
-      sheetCard(ig)));
+      sheetCard(ig),
+      recoveryCard(f)));
+}
+
+function recoveryCard(f) {
+  const rec = f.recovery ||= { partials: false, resume: false };
+  const hasContact = f.questions.some((q) => q.type === 'email' || q.type === 'phone');
+  return el('section', { class: 'card card-span' },
+    el('h3', { text: 'Pemulihan jawaban yang belum selesai' }),
+    el('p', { class: 'muted small', text: 'Rata-rata 1 dari 3 orang yang mulai mengisi form berhenti di tengah (benchmark Zuko). Fitur ini membantu tim menghubungi mereka dan membiarkan responden melanjutkan.' }),
+    el('div', { class: 'recovery-grid' },
+      el('div', {},
+        toggle('Simpan jawaban yang belum selesai', rec, 'partials', { hint: 'Mulai disimpan begitu email atau nomor telepon valid terisi. Muncul di tab Hasil → "Belum selesai".' }),
+        !hasContact && rec.partials ? el('p', { class: 'bad small', text: 'Form ini belum punya pertanyaan Email atau Nomor telepon, jadi tidak ada yang bisa disimpan.' }) : null,
+        rec.partials ? field('Kalimat persetujuan (tampil di bawah kolom kontak)', bind(rec, 'consentText', { type: 'textarea', placeholder: DEFAULT_CONSENT_TEXT }),
+          `Diperlukan UU PDP (UU 27/2022): responden perlu tahu kontaknya disimpan sebelum form dikirim. Data dihapus otomatis saat mereka submit, atau setelah ${PARTIAL_RETENTION_DAYS} hari.`) : null,
+        toggle('Lanjutkan dari pertanyaan terakhir', rec, 'resume', { hint: 'Jawaban disimpan di browser responden selama 7 hari. Matikan untuk form yang diisi di komputer bersama (mis. di kelas).' })),
+      el('div', { class: 'retarget' },
+        el('h4', { text: 'Retargeting di Meta Ads' }),
+        el('p', { class: 'muted small', text: 'Form mengirim event FormStart (jawaban pertama), FormContact (kontak terisi), dan Lead (terkirim). Buat audiens orang yang hampir mendaftar:' }),
+        el('ol', { class: 'small steps' },
+          el('li', { text: 'Ads Manager → Audiens → Buat audiens → Audiens khusus → Situs web.' }),
+          el('li', {}, 'Sertakan orang yang memicu ', el('code', { text: 'FormContact' }), ' dalam 14 hari terakhir.'),
+          el('li', {}, 'Kecualikan orang yang memicu ', el('code', { text: 'Lead' }), ' dalam 14 hari terakhir.'),
+          el('li', { text: 'Pakai audiens itu untuk iklan pengingat, mis. "Kursi tinggal sedikit".' })),
+        pixelHint(f))));
+}
+
+function pixelHint(f) {
+  return f.tracking?.fbPixelId ? null : el('p', { class: 'bad small', text: 'Isi Pixel ID di kartu Meta Pixel agar event di atas terkirim.' });
 }
 
 // ─── Share tab ──────────────────────────────────────────────────────────────
@@ -831,6 +866,7 @@ async function save() {
   }
 }
 
+/** Loads a form into the builder; returns false (and keeps the current form) if it can't be opened. */
 async function openForm(id) {
   try {
     state.form = await backend.getForm(id);
@@ -838,7 +874,11 @@ async function openForm(id) {
     setUrl(`?id=${encodeURIComponent(id)}`);
     await refreshPicker();
     render();
-  } catch (err) { toast(err.message, 'bad'); }
+    return true;
+  } catch (err) {
+    toast(err.message, 'bad');
+    return false;
+  }
 }
 
 function newForm() {
@@ -884,6 +924,16 @@ function setupSettings() {
   });
 }
 
+/** The preview's example data is rebuilt when the demo gains features (bump DEMO_VERSION). */
+const DEMO_VERSION = '2';
+function resetOutdatedDemo() {
+  try {
+    if (localStorage.getItem('tf_demo_version') === DEMO_VERSION) return;
+    Object.keys(localStorage).filter((k) => k.startsWith('tf_') || k.startsWith('ff_progress_')).forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem('tf_demo_version', DEMO_VERSION);
+  } catch { /* storage unavailable */ }
+}
+
 async function init() {
   document.getElementById('openSettings').append(icon('settings', { size: 18 }));
   document.getElementById('preview').append(icon('eye', { size: 16 }), 'Pratinjau');
@@ -912,11 +962,14 @@ async function init() {
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); }
   });
 
+  if (DEMO) resetOutdatedDemo();
   const id = new URLSearchParams(location.search).get('id');
   const tab = location.hash.slice(1);
   if (['content', 'logic', 'connect', 'share', 'results'].includes(tab)) state.tab = tab;
   state.form = blankForm();
-  if (id) { await openForm(id); return; }
+  // A stale ?id= (deleted form, other browser) falls through to the normal start instead of a blank page.
+  if (id && await openForm(id)) return;
+  if (id) setUrl('');
   try { state.forms = await backend.listForms(); } catch { state.forms = []; }
   if (state.forms[0]) { await openForm(state.forms[0].id); return; }
   if (DEMO) {

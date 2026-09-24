@@ -1,6 +1,6 @@
 // Pure analytics aggregation shared by every backend.
 // responses: [{ submittedAt: ISO, responseId, answers: {qid: value}, hidden: {k: v} }]
-// events:    [{ ts: ISO, sessionId, type: 'view'|'start'|'abandon'|'complete', path: [qid] }]
+// events:    [{ ts: ISO, sessionId, type: 'view'|'start'|'abandon'|'partial'|'complete', path: [qid] }]
 
 import { scaleRange, plainTitle } from './logic.js';
 
@@ -44,7 +44,8 @@ export function computeStats(form, responses, events, { days = 30, today = new D
     if (e.type === 'view') s.view = true;
     if (e.type === 'start') s.start = true;
     if (e.type === 'complete') { s.complete = true; s.start = true; }
-    if (e.type === 'abandon') s.start = s.start || (e.path || []).length > 0;
+    // 'partial' = progress saved after contact details were entered; same funnel meaning as 'abandon'.
+    if (e.type === 'abandon' || e.type === 'partial') s.start = s.start || (e.path || []).length > 0;
     if ((e.path || []).length > s.path.length) s.path = e.path;
     sessions.set(e.sessionId, s);
   }
@@ -234,17 +235,34 @@ export function statsFromAggregates(form, { daily = [], funnel = [], counts = []
   };
 }
 
-export function toCSV(form, responses) {
-  const qs = (form.questions || []).filter((q) => q.type !== 'statement');
-  const hiddenKeys = form.hiddenFields || [];
-  const head = ['Submitted At', 'Response ID', ...qs.map((q) => plainTitle(q.title)), ...hiddenKeys];
+/** RFC 4180 CSV with spreadsheet formula injection neutralised. */
+export function rowsToCSV(head, rows) {
   const esc = (v) => {
     let s = Array.isArray(v) ? v.join(', ') : String(v ?? '');
     if (/^[=+\-@]/.test(s)) s = `'${s}`; // neutralise spreadsheet formula injection
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  return [head, ...rows].map((row) => row.map(esc).join(',')).join('\n');
+}
+
+export function toCSV(form, responses) {
+  const qs = (form.questions || []).filter((q) => q.type !== 'statement');
+  const hiddenKeys = form.hiddenFields || [];
+  const head = ['Submitted At', 'Response ID', ...qs.map((q) => plainTitle(q.title)), ...hiddenKeys];
   const rows = responses.map((r) => [
     r.submittedAt, r.responseId, ...qs.map((q) => r.answers?.[q.id]), ...hiddenKeys.map((k) => r.hidden?.[k]),
   ]);
-  return [head, ...rows].map((row) => row.map(esc).join(',')).join('\n');
+  return rowsToCSV(head, rows);
+}
+
+/** Unfinished responses (contacts to follow up), newest first. */
+export function partialsCSV(form, partials) {
+  const qs = (form.questions || []).filter((q) => q.type !== 'statement');
+  const title = (id, fallback) => plainTitle(qs.find((q) => q.id === id)?.title) || fallback || '';
+  const head = ['Terakhir aktif', 'Nama', 'Email', 'Telepon', 'Berhenti di', 'utm_source', ...qs.map((q) => plainTitle(q.title))];
+  const rows = partials.map((p) => [
+    p.updatedAt, p.contact?.name, p.contact?.email, p.contact?.phone, title(p.lastQuestion, p.lastQuestionTitle), p.hidden?.utm_source,
+    ...qs.map((q) => p.answers?.[q.id]),
+  ]);
+  return rowsToCSV(head, rows);
 }

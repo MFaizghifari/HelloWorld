@@ -1,6 +1,6 @@
 // Example data for the preview Artifact, so the Results tab has something to
 // show. Everything written here is fictitious and labelled as such in the UI.
-import { END, firstQuestionId, nextQuestionId, scaleRange } from './logic.js';
+import { END, firstQuestionId, nextQuestionId, scaleRange, partialsEnabled, contactFrom } from './logic.js';
 
 const NAMES = ['Ayu', 'Budi', 'Citra', 'Dimas', 'Eka', 'Fajar', 'Gita', 'Hendra', 'Intan', 'Joko', 'Kirana', 'Lukman', 'Maya', 'Nanda', 'Oki', 'Putri', 'Rizky', 'Sari', 'Tono', 'Wulan'];
 const SOURCES = [['facebook', 0.45], ['instagram', 0.25], ['tiktok', 0.1], [null, 0.2]];
@@ -48,6 +48,7 @@ export function seedExampleData(form, { days = 14, sessions = 150, seed = 42 } =
   const r = rng(seed);
   const responses = [];
   const events = [];
+  const partials = {};
   const now = Date.now();
   for (let i = 0; i < sessions; i++) {
     // Traffic grows towards today, like a campaign ramping up.
@@ -83,6 +84,14 @@ export function seedExampleData(form, { days = 14, sessions = 150, seed = 42 } =
       events.push({ ts: ts(duration), sessionId, type: 'complete', path });
     } else {
       events.push({ ts: ts(duration / 2), sessionId, type: 'abandon', path });
+      const contact = partialsEnabled(form) && contactFrom(form, answers);
+      if (contact) {
+        const src = weighted(r, SOURCES);
+        partials[sessionId] = {
+          sessionId, updatedAt: ts(duration / 2), answers, hidden: src ? { utm_source: src } : {}, contact,
+          lastQuestion: path[path.length - 1], answeredCount: Object.keys(answers).length,
+        };
+      }
     }
   }
   responses.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
@@ -90,6 +99,7 @@ export function seedExampleData(form, { days = 14, sessions = 150, seed = 42 } =
   try {
     localStorage.setItem(`tf_resp_${form.id}`, JSON.stringify(responses));
     localStorage.setItem(`tf_evt_${form.id}`, JSON.stringify(events));
+    localStorage.setItem(`tf_part_${form.id}`, JSON.stringify(partials));
   } catch { /* storage unavailable: the Results tab simply starts empty */ }
   return { responses: responses.length, sessions };
 }

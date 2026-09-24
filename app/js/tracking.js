@@ -93,6 +93,13 @@ export function createTracker(tracking = {}, { formId, formTitle } = {}) {
       if (gtm) window.dataLayer.push({ event: 'form_start', ...base });
       toParent('FormStart', {});
     },
+    /** Contact details entered (not yet submitted): the audience to retarget. */
+    contact() {
+      if (pixel) window.fbq('trackCustom', 'FormContact', base);
+      if (ga4) window.gtag('event', 'form_contact', base);
+      if (gtm) window.dataLayer.push({ event: 'form_contact', ...base });
+      toParent('FormContact', {});
+    },
     step(question, index) {
       if (!t.stepEvents) return;
       const p = { ...base, question_id: question.id, question_title: question.title, step: index + 1 };

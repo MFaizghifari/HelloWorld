@@ -2,8 +2,9 @@
 // charts, latest responses. mountResults() renders into any container, so it
 // runs both as a tab inside the builder and on dashboard.html.
 import { el } from './dom.js';
-import { computeStats, toCSV } from './stats.js';
-import { plainTitle } from './logic.js';
+import { computeStats, toCSV, partialsCSV } from './stats.js';
+import { plainTitle, whatsappLink, partialsEnabled } from './logic.js';
+import { icon } from './icons.js';
 
 const SERIES = { views: '#D9A300', completions: '#3967BD' }; // validated pair (CVD ΔE 32.6)
 const SVG = 'http://www.w3.org/2000/svg';
@@ -142,6 +143,48 @@ function responsesTable(form, rows) {
       el('td', { text: r.hidden?.utm_source || '' }))))));
 }
 
+function downloadCSV(name, csv) {
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `${name}.csv` });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function ago(iso) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 60) return `${Math.max(1, min)} menit lalu`;
+  if (min < 1440) return `${Math.round(min / 60)} jam lalu`;
+  return `${Math.round(min / 1440)} hari lalu`;
+}
+
+/** Contacts who started but did not submit: the list the team follows up. */
+function partialsSection(form, partials, { canDownload }) {
+  const title = (p) => plainTitle(form.questions.find((q) => q.id === p.lastQuestion)?.title) || p.lastQuestionTitle || '–';
+  const head = el('div', { class: 'row between' },
+    el('h3', { style: 'margin:0', text: `Belum selesai: ${fmt.format(partials.length)} kontak` }),
+    canDownload && partials.length
+      ? el('button', { class: 'btn-ghost small', type: 'button', onclick: () => downloadCSV(`${form.title || 'form'} - belum selesai`, partialsCSV(form, partials)) }, 'Ekspor CSV')
+      : null);
+  const note = el('p', { class: 'muted small', text: 'Orang yang sudah mengisi email atau nomor telepon tapi belum mengirim form. Otomatis hilang dari daftar begitu mereka submit, dan dihapus setelah 30 hari.' });
+  if (!partialsEnabled(form)) {
+    return el('section', { class: 'card' }, head, el('p', { class: 'muted small', text: 'Fitur ini belum aktif untuk form ini. Nyalakan di tab Integrasi → "Pemulihan jawaban yang belum selesai".' }));
+  }
+  if (!partials.length) return el('section', { class: 'card' }, head, note, el('p', { class: 'empty-state', text: 'Belum ada kontak yang berhenti di tengah pada rentang ini.' }));
+  return el('section', { class: 'card' }, head, note,
+    el('div', { class: 'table-wrap' }, el('table', { class: 'data' },
+      el('thead', {}, el('tr', {}, ['Terakhir aktif', 'Nama', 'Kontak', 'Berhenti di', 'Sumber', ''].map((t) => el('th', { text: t })))),
+      el('tbody', {}, partials.map((p) => {
+        const c = p.contact || {};
+        const wa = whatsappLink(c.phone, `Halo ${c.name || ''}, kami lihat Anda belum selesai mengisi "${form.title}". Ada yang bisa kami bantu?`.replace('Halo ,', 'Halo,'));
+        return el('tr', {},
+          el('td', { title: new Date(p.updatedAt).toLocaleString('id-ID'), text: ago(p.updatedAt) }),
+          el('td', { text: c.name || '–' }),
+          el('td', {}, el('div', { class: 'contact-cell' }, c.phone ? el('span', { text: c.phone }) : null, c.email ? el('span', { class: 'muted', text: c.email }) : null)),
+          el('td', { text: `${title(p)} (${p.answeredCount ?? Object.keys(p.answers || {}).length} dijawab)` }),
+          el('td', { text: p.hidden?.utm_source || '(direct)' }),
+          el('td', {}, wa ? el('a', { class: 'btn-wa', href: wa, target: '_blank', rel: 'noopener' }, icon('whatsapp', { size: 14 }), 'Chat WA') : null));
+      })))));
+}
+
 // ─── Mount ──────────────────────────────────────────────────────────────────
 /**
  * @param {HTMLElement} host
@@ -151,7 +194,7 @@ function responsesTable(form, rows) {
  *   canDownload false hides CSV export (sandboxed previews block downloads)
  */
 export function mountResults(host, { backend, formId, form: givenForm = null, demoNote = '', canDownload = true }) {
-  let current = { form: null, responses: [], events: [] };
+  let current = { form: null, responses: [], events: [], partials: [] };
   const range = el('select', { 'aria-label': 'Rentang waktu', class: 'res-range' },
     [['7', '7 hari terakhir'], ['30', '30 hari terakhir'], ['90', '90 hari terakhir'], ['365', '1 tahun']].map(([v, t]) => el('option', { value: v, selected: v === '30', text: t })));
   const sheetLink = el('a', { class: 'btn-ghost small', target: '_blank', rel: 'noopener', hidden: true, text: 'Buka Google Sheet' });
@@ -184,6 +227,8 @@ export function mountResults(host, { backend, formId, form: givenForm = null, de
       latest = resp.slice(-100).reverse();
       totalInRange = resp.length;
     }
+    const since = Date.now() - days * 86400000;
+    const partials = (current.partials || []).filter((p) => new Date(p.updatedAt).getTime() >= since);
     const worst = [...s.funnel].sort((a, b) => b.droppedHere - a.droppedHere)[0];
     const medDur = s.medianDurationSec === null || s.medianDurationSec === undefined ? null : Math.round(s.medianDurationSec);
 
@@ -197,7 +242,8 @@ export function mountResults(host, { backend, formId, form: givenForm = null, de
         kpi('Mulai mengisi', fmt.format(s.starts), `${pct(s.startRate)} dari views`),
         kpi('Submission', fmt.format(s.completions), `rata-rata ${fmt.format(Math.round(s.completions / days))}/hari`),
         kpi('Completion rate', pct(s.completionRate), `${pct(s.completionOfStarts)} dari yang mulai`),
-        kpi('Median waktu isi', medDur ? `${Math.floor(medDur / 60)}m ${medDur % 60}d` : '–', 'dari submission')),
+        kpi('Median waktu isi', medDur ? `${Math.floor(medDur / 60)}m ${medDur % 60}d` : '–', 'dari submission'),
+        partialsEnabled(form) ? kpi('Kontak belum kirim', fmt.format(partials.length), 'bisa di-follow up') : null),
       el('section', { class: 'card' }, el('h3', { text: 'Tren harian' }), lineChart(s.daily)),
       el('div', { class: 'grid2' },
         el('section', { class: 'card' },
@@ -211,6 +257,7 @@ export function mountResults(host, { backend, formId, form: givenForm = null, de
           Object.keys(s.sources).length
             ? bars(Object.entries(s.sources).sort((a, b) => b[1] - a[1]).slice(0, 10), { percentOf: s.completions })
             : el('p', { class: 'muted', text: 'Belum ada data.' }))),
+      partialsSection(form, partials, { canDownload }),
       el('h2', { class: 'section-title', text: 'Jawaban per pertanyaan' }),
       el('div', { class: 'grid2' }, s.perQuestion.map(questionCard)),
       el('section', { class: 'card' }, el('h3', { text: `Jawaban terbaru (${fmt.format(latest.length)} dari ${fmt.format(totalInRange)})` }), responsesTable(form, latest)),
@@ -250,9 +297,7 @@ export function mountResults(host, { backend, formId, form: givenForm = null, de
         rows = await backend.exportAll(current.form.id, (n) => { csvBtn.textContent = `Mengambil ${fmt.format(n)}…`; });
       } catch (err) { status.textContent = `Ekspor gagal: ${err.message}`; return; } finally { csvBtn.disabled = false; csvBtn.textContent = 'Ekspor CSV'; }
     }
-    const blob = new Blob([`\uFEFF${toCSV(current.form, rows)}`], { type: 'text/csv;charset=utf-8' });
-    const a = el('a', { href: URL.createObjectURL(blob), download: `${current.form.title || 'form'}.csv` });
-    a.click(); URL.revokeObjectURL(a.href);
+    downloadCSV(current.form.title || 'form', toCSV(current.form, rows));
   });
   load();
   return { reload: load };
