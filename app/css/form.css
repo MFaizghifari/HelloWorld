@@ -1,4 +1,4 @@
-/* FormFlow respondent UI — Typeform-style. Everything is scoped under .ff so the
+/* Belajarlagi Form respondent UI — Typeform-style. Everything is scoped under .ff so the
    builder canvas can render the exact same markup. Theme values come from
    renderer.applyTheme() as CSS custom properties. */
 .ff {

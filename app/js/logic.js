@@ -417,3 +417,26 @@ export function uid(prefix = 'q') {
   const rnd = Math.random().toString(36).slice(2, 8);
   return `${prefix}_${Date.now().toString(36).slice(-4)}${rnd}`;
 }
+
+// ─── Custom form links ──────────────────────────────────────────────────────
+// A form can have its own short path, e.g. https://belajarlagiform.<akun>.workers.dev/beasiswa-2026.
+// One path segment of lower-case letters, digits and dashes, so it never collides
+// with a static file (those have a dot) or with the routes below.
+export const SLUG_MAX = 50;
+export const RESERVED_SLUGS = ['api', 'f', 'm', 'css', 'js', 'img', 'assets', 'static', 'index', 'form', 'dashboard', 'embed', 'admin', 'login', 'masuk', 'logout', 'tim', 'team', 'settings', 'favicon', 'robots', 'sitemap', 'well-known'];
+
+export function cleanSlug(raw) {
+  return String(raw || '').toLowerCase().trim()
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, SLUG_MAX).replace(/-+$/, '');
+}
+
+/** Why a slug cannot be used, or null. Expects an already-cleaned slug. */
+export function slugProblem(slug) {
+  const s = String(slug || '');
+  if (s.length < 3) return 'Link minimal 3 karakter.';
+  if (s.length > SLUG_MAX) return `Link maksimal ${SLUG_MAX} karakter.`;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(s)) return 'Pakai huruf kecil, angka, dan tanda hubung saja.';
+  if (RESERVED_SLUGS.includes(s)) return `"${s}" dipakai sistem. Pilih nama lain.`;
+  return null;
+}

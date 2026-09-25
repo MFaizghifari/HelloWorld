@@ -1,4 +1,4 @@
--- FormFlow on Cloudflare D1.
+-- Belajarlagi Form on Cloudflare D1.
 -- Raw submissions live in `responses`; the dashboard reads the small
 -- pre-aggregated tables (daily, funnel, answer_counts) so its cost does not
 -- grow with the number of submissions.

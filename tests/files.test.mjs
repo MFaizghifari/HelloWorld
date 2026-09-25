@@ -84,7 +84,7 @@ test('submit keeps only this visit\'s own uploads, with the server\'s name, type
   const r = await api(env, { action: 'submit', formId: form.id, answers: { q_name: 'Ayu', q_ktm: [lie] }, meta: { sessionId: 's_me1' } });
   assert.equal(r.ok, true, r.error);
   const stored = JSON.parse(env.DB.raw.prepare('SELECT answers FROM responses').get().answers).q_ktm[0];
-  assert.deepEqual(stored, { ref: mine.ref, name: 'KTM depan.png', type: 'image/png', size: PNG.length, url: `https://formflow.test/f/${mine.ref}` });
+  assert.deepEqual(stored, { ref: mine.ref, name: 'KTM depan.png', type: 'image/png', size: PNG.length, url: `https://belajarlagiform.test/f/${mine.ref}` });
   assert.equal(env.DB.raw.prepare('SELECT response_id FROM uploads WHERE key = ?').get(mine.ref).response_id, r.responseId);
 
   // Unattached uploads older than a day are deleted, attached ones stay.
@@ -162,7 +162,7 @@ test('pending uploads have a byte budget, are rate-limited per /64, and PDFs dow
 
   env.PENDING_FORM_BYTES = '';
   const pdf = await (await up(env, PDF, { q: 'q_cv', s: 's_pdf', name: 'cv.pdf' })).json();
-  const signed = await (await import('../worker/src/files.js')).signedFileUrl(env, `https://formflow.test/f/${pdf.file.ref}`);
+  const signed = await (await import('../worker/src/files.js')).signedFileUrl(env, `https://belajarlagiform.test/f/${pdf.file.ref}`);
   const res = await get(env, new URL(signed).pathname + new URL(signed).search);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('Content-Disposition'), /^attachment/);

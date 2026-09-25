@@ -1,9 +1,9 @@
-// FormFlow API on Cloudflare Workers + D1.
+// Belajarlagi Form API on Cloudflare Workers + D1.
 // Speaks the same JSON protocol as apps-script/Code.gs, so the frontend
 // adapter is shared. Static files in ../app are served by Workers Assets.
 import {
   validateAnswer, partialsEnabled, contactFrom, cleanPartialAnswers, PARTIAL_RETENTION_DAYS,
-  variantForm, allQuestions, variantTag, answerText,
+  variantForm, allQuestions, variantTag, answerText, cleanSlug, slugProblem,
 } from '../../app/js/logic.js';
 import { answerIncrements, statsFromAggregates, SEGMENT_DIMS } from '../../app/js/stats.js';
 import { deviceOf, validDevice, cleanSource } from '../../app/js/traffic.js';
@@ -54,7 +54,7 @@ function bumpSegments(env, formId, day, dims, field) {
 // ─── Forms ──────────────────────────────────────────────────────────────────
 async function loadForm(env, id, { cache = true } = {}) {
   validId(id);
-  const cacheKey = new Request(`https://formflow.cache/form/${id}`);
+  const cacheKey = new Request(`https://belajarlagiform.cache/form/${id}`);
   const edge = typeof caches !== 'undefined' && cache ? caches.default : null;
   if (edge) {
     const hit = await edge.match(cacheKey);
@@ -102,17 +102,19 @@ async function saveForm(env, form, actor) {
   }
   const now = new Date().toISOString();
   form.updatedAt = now;
+  if (form.slug) form.slug = cleanSlug(form.slug); else delete form.slug;
   const json = JSON.stringify(form);
   if (json.length > 500_000) throw new HttpError(413, 'Form terlalu besar.');
   const sheetInput = form.integrations?.sheetUrl;
   const sheetId = sheetInput ? parseSheetId(sheetInput) : null;
   if (sheetInput && !sheetId) throw new HttpError(400, 'Link Google Sheet tidak valid.');
+  const slug = form.slug ? await claimSlug(env, form) : null;
   await env.DB.prepare(`
-    INSERT INTO forms (id, title, json, sheet_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)
-    ON CONFLICT(id) DO UPDATE SET title = ?2, json = ?3, sheet_id = ?4, updated_at = ?5,
+    INSERT INTO forms (id, title, json, sheet_id, slug, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?6, ?5, ?5)
+    ON CONFLICT(id) DO UPDATE SET title = ?2, json = ?3, sheet_id = ?4, slug = ?6, updated_at = ?5,
       sheet_cols = CASE WHEN forms.sheet_id IS ?4 THEN forms.sheet_cols ELSE '[]' END`)
-    .bind(form.id, String(form.title || '').slice(0, 300), json, sheetId, now).run();
-  if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://formflow.cache/form/${form.id}`));
+    .bind(form.id, String(form.title || '').slice(0, 300), json, sheetId, now, slug).run();
+  if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://belajarlagiform.cache/form/${form.id}`));
   await auth.audit(env, actor, prev ? 'form.publish' : 'form.create', form.title || form.id);
   const x = form.experiment;
   const was = prev?.experiment;
@@ -125,9 +127,25 @@ async function saveForm(env, form, actor) {
   return { ok: true, form, sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : '' };
 }
 
+/** Checks a custom link and makes sure no other form uses it. */
+async function claimSlug(env, form) {
+  const problem = slugProblem(form.slug);
+  if (problem) throw new HttpError(400, problem);
+  const other = await env.DB.prepare('SELECT title FROM forms WHERE slug = ? AND id != ?').bind(form.slug, form.id).first();
+  if (other) throw new HttpError(409, `Link /${form.slug} sudah dipakai form "${other.title || 'lain'}". Pilih nama lain.`);
+  return form.slug;
+}
+
+async function formIdForSlug(env, raw) {
+  const slug = cleanSlug(raw);
+  if (slugProblem(slug) || slug !== String(raw)) return null;
+  const row = await env.DB.prepare('SELECT id FROM forms WHERE slug = ?').bind(slug).first();
+  return row?.id || null;
+}
+
 async function listForms(env) {
-  const { results } = await env.DB.prepare('SELECT id, title, sheet_id, updated_at FROM forms ORDER BY updated_at DESC').all();
-  return results.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updated_at, sheetUrl: r.sheet_id ? `https://docs.google.com/spreadsheets/d/${r.sheet_id}/edit` : '' }));
+  const { results } = await env.DB.prepare('SELECT id, title, slug, sheet_id, updated_at FROM forms ORDER BY updated_at DESC').all();
+  return results.map((r) => ({ id: r.id, title: r.title, slug: r.slug || '', updatedAt: r.updated_at, sheetUrl: r.sheet_id ? `https://docs.google.com/spreadsheets/d/${r.sheet_id}/edit` : '' }));
 }
 
 async function deleteForm(env, id, actor) {
@@ -136,7 +154,7 @@ async function deleteForm(env, id, actor) {
   await deleteFormFiles(env, id);
   await env.DB.batch(['forms', 'responses', 'sessions', 'daily', 'funnel', 'answer_counts', 'partials', 'segments', 'uploads'].map((t) =>
     env.DB.prepare(`DELETE FROM ${t} WHERE ${t === 'forms' ? 'id' : 'form_id'} = ?`).bind(id)));
-  if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://formflow.cache/form/${id}`));
+  if (typeof caches !== 'undefined') await caches.default.delete(new Request(`https://belajarlagiform.cache/form/${id}`));
   await auth.audit(env, actor, 'form.delete', row?.title || id);
   return { ok: true };
 }
@@ -479,13 +497,25 @@ const AUTH_ACTIONS = {
   teamTransferOwner: auth.teamTransferOwner,
 };
 
+/** The form page's HTML, served under a custom link (following the assets' own .html → clean-URL redirect). */
+async function formPage(env, url) {
+  let res = await env.ASSETS.fetch(new Request(new URL('/form.html', url)));
+  if (res.status >= 300 && res.status < 400 && res.headers.get('Location')) res = await env.ASSETS.fetch(new Request(new URL(res.headers.get('Location'), url)));
+  const out = new Response(res.body, res);
+  out.headers.set('Cache-Control', 'no-cache');
+  return out;
+}
+
 async function handleApi(request, env, ctx) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
   if (request.method === 'GET') {
     const action = url.searchParams.get('action');
     if (action === 'getForm') {
-      const form = await loadForm(env, url.searchParams.get('id'));
+      const slug = url.searchParams.get('slug');
+      const id = slug ? await formIdForSlug(env, slug) : url.searchParams.get('id');
+      if (!id) throw new HttpError(404, 'Form tidak ditemukan. Periksa lagi link-nya.');
+      const form = await loadForm(env, id);
       return json({ ok: true, form: publicForm(form) }, 200, { 'Cache-Control': `public, max-age=${FORM_CACHE_SEC}` });
     }
     if (action === 'health') return json({ ok: true, time: new Date().toISOString() });
@@ -534,10 +564,14 @@ export default {
     if (url.pathname.startsWith('/f/')) return withErrors(() => serveFile(request, env, url));
     if (url.pathname.startsWith('/m/')) return withErrors(() => serveMedia(env, url));
     // Tells the static frontend (served from the same Worker) to use this API.
-    if (url.pathname === '/formflow-config.js') {
-      return new Response('window.FORMFLOW_CONFIG={backend:"cloud",apiUrl:"/api"};', {
+    if (url.pathname === '/belajarlagiform-config.js') {
+      return new Response('window.BELAJARLAGIFORM_CONFIG={backend:"cloud",apiUrl:"/api"};', {
         headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
       });
+    }
+    // Custom form link: /<slug> shows the form page; form.js reads the slug from the path.
+    if (env.ASSETS && request.method === 'GET' && /^\/[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(url.pathname)) {
+      if (await formIdForSlug(env, url.pathname.slice(1))) return formPage(env, url);
     }
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response('Not found', { status: 404 });

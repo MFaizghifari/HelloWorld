@@ -1,7 +1,7 @@
 /*
- * FormFlow embed script.
- *   Inline: <div data-formflow-inline="https://…/form.html?id=…" style="height:600px"></div>
- *   Popup:  <button data-formflow="https://…/form.html?id=…">Isi form</button>
+ * Belajarlagi Form embed script.
+ *   Inline: <div data-belajarlagiform-inline="https://…/form.html?id=…" style="height:600px"></div>
+ *   Popup:  <button data-belajarlagiform="https://…/form.html?id=…">Isi form</button>
  *
  * Why use this instead of a bare <iframe>?
  *  - Forwards the host page's UTM/fbclid params into the form (hidden fields).
@@ -11,8 +11,8 @@
  *    double counting.
  */
 (function () {
-  if (window.__formflowEmbed) return;
-  window.__formflowEmbed = true;
+  if (window.__belajarlagiformEmbed) return;
+  window.__belajarlagiformEmbed = true;
 
   var FORWARD = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
   var frames = [];
@@ -53,7 +53,7 @@
     if (node.dataset.ffMounted) return;
     node.dataset.ffMounted = '1';
     if (!node.style.height) node.style.height = '600px';
-    node.appendChild(makeFrame(node.getAttribute('data-formflow-inline')));
+    node.appendChild(makeFrame(node.getAttribute('data-belajarlagiform-inline')));
   }
 
   function openPopup(raw) {
@@ -91,17 +91,17 @@
       Object.keys(params).forEach(function (k) { if (k !== 'eventID') clean[k] = params[k]; });
       window.fbq(FB_STANDARD.indexOf(d.name) >= 0 ? 'track' : 'trackCustom', d.name, clean, opts);
     }
-    if (typeof window.gtag === 'function') window.gtag('event', 'formflow_' + d.name.toLowerCase(), params);
-    if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'formflow_' + d.name.toLowerCase() }, params));
-    document.dispatchEvent(new CustomEvent('formflow:' + d.name, { detail: params }));
+    if (typeof window.gtag === 'function') window.gtag('event', 'belajarlagiform_' + d.name.toLowerCase(), params);
+    if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'belajarlagiform_' + d.name.toLowerCase() }, params));
+    document.dispatchEvent(new CustomEvent('belajarlagiform:' + d.name, { detail: params }));
   });
 
   function scan() {
-    document.querySelectorAll('[data-formflow-inline]').forEach(mountInline);
-    document.querySelectorAll('[data-formflow]').forEach(function (b) {
+    document.querySelectorAll('[data-belajarlagiform-inline]').forEach(mountInline);
+    document.querySelectorAll('[data-belajarlagiform]').forEach(function (b) {
       if (b.dataset.ffBound) return;
       b.dataset.ffBound = '1';
-      b.addEventListener('click', function (e) { e.preventDefault(); openPopup(b.getAttribute('data-formflow')); });
+      b.addEventListener('click', function (e) { e.preventDefault(); openPopup(b.getAttribute('data-belajarlagiform')); });
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan); else scan();

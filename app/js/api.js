@@ -94,13 +94,16 @@ const localBackend = {
       .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   },
   async getForm(id) {
-    const f = LS.read('tf_forms', {})[id];
+    const all = LS.read('tf_forms', {});
+    const f = id.startsWith('slug:') ? Object.values(all).find((x) => x.slug === id.slice(5)) : all[id];
     if (!f) throw new Error('Form tidak ditemukan.');
     return f;
   },
   async saveForm(form) {
     const forms = LS.read('tf_forms', {});
     const before = forms[form.id];
+    const taken = form.slug && Object.values(forms).find((x) => x.slug === form.slug && x.id !== form.id);
+    if (taken) throw new Error(`Link /${form.slug} sudah dipakai form "${taken.title || 'lain'}". Pilih nama lain.`);
     const saved = { ...form, updatedAt: new Date().toISOString() };
     forms[form.id] = saved;
     LS.write('tf_forms', forms);
@@ -314,7 +317,7 @@ function httpBackend(url, name) {
       const data = await res.json().catch(() => ({ ok: false, error: `Respons backend tidak valid (HTTP ${res.status}).` }));
       if (!data.ok) {
         // The builder listens for this and shows the sign-in screen.
-        if (cloud && admin && res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('formflow:signed-out', { detail: data.error }));
+        if (cloud && admin && res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('belajarlagiform:signed-out', { detail: data.error }));
         const err = new Error(data.error || 'Permintaan gagal.');
         err.status = res.status;
         throw err;
@@ -329,9 +332,10 @@ function httpBackend(url, name) {
     files: true,
     async listForms() { return (await call('listForms', {}, { admin: true })).forms; },
     async getForm(id) {
-      // GET is cacheable and cheaper for the public form view.
+      // GET is cacheable and cheaper for the public form view. "slug:<x>" looks up a custom link.
       const sep = url.includes('?') ? '&' : '?';
-      const res = await fetch(`${url}${sep}action=getForm&id=${encodeURIComponent(id)}`);
+      const q = id.startsWith('slug:') ? `slug=${encodeURIComponent(id.slice(5))}` : `id=${encodeURIComponent(id)}`;
+      const res = await fetch(`${url}${sep}action=getForm&${q}`);
       const data = await res.json().catch(() => ({ ok: false, error: `Backend tidak merespons dengan benar (HTTP ${res.status}).` }));
       if (!data.ok) throw new Error(data.error || 'Form tidak ditemukan.');
       return data.form;

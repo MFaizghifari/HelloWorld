@@ -66,7 +66,7 @@ export function mountForm(host, form, { backend = null, preview = false, embedde
   const prevBtn = el('button', { type: 'button', 'aria-label': 'Pertanyaan sebelumnya' }, icon('chevronUp', { size: 20 }));
   const nextBtn = el('button', { type: 'button', 'aria-label': 'Pertanyaan berikutnya' }, icon('chevronDown', { size: 20 }));
   const nav = el('div', { class: 'ff-nav', hidden: true }, prevBtn, nextBtn);
-  const brand = el('span', { class: 'ff-brand' }, 'Dibuat dengan ', el('strong', { text: 'FormFlow' }));
+  const brand = el('span', { class: 'ff-brand' }, 'Dibuat dengan ', el('strong', { text: 'Belajarlagi Form' }));
   root.append(el('div', { class: 'ff-progress', 'aria-hidden': 'true' }, bar), stage, el('div', { class: 'ff-bottom' }, brand, nav));
   if (preview) root.append(el('div', { class: 'ff-preview-badge', text: 'PRATINJAU · jawaban tidak disimpan' }));
   host.replaceChildren(root);

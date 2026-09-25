@@ -1,4 +1,4 @@
-name = "formflow"
+name = "belajarlagiform"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 
@@ -10,8 +10,8 @@ binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "formflow"
-# Paste the id printed by: npx wrangler d1 create formflow --location apac
+database_name = "belajarlagiform"
+# Paste the id printed by: npx wrangler d1 create belajarlagiform --location apac
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
@@ -43,10 +43,10 @@ namespace_id = "1003"
 simple = { limit = 60, period = 60 }
 
 # Uploaded files (respondent answers, private) and form images (public).
-# Create once: npx wrangler r2 bucket create formflow-files
+# Create once: npx wrangler r2 bucket create belajarlagiform-files
 [[r2_buckets]]
 binding = "FILES"
-bucket_name = "formflow-files"
+bucket_name = "belajarlagiform-files"
 
 [observability]
 enabled = true

@@ -6,7 +6,7 @@ import { el } from './dom.js';
 import { icon } from './icons.js';
 import {
   END, QUESTION_TYPES, OPERATORS, uid, findLogicProblems, plainTitle, nextQuestionId, partialsEnabled, DEFAULT_CONSENT_TEXT, PARTIAL_RETENTION_DAYS,
-  VARIANT_KEYS, variantForm, allQuestions, FILE_KINDS, fileRules,
+  VARIANT_KEYS, variantForm, allQuestions, FILE_KINDS, fileRules, cleanSlug, slugProblem,
 } from './logic.js';
 import {
   applyTheme, normalizeTheme, THEME_PRESETS, FONTS, PHONE_COUNTRIES, questionNumber, welcomeScreen, questionScreen, thankYouScreen, brandLogo,
@@ -255,7 +255,11 @@ function questionTitle(q) {
   return plainTitle(q.title) || (q.type === 'statement' ? '(pernyataan kosong)' : '(tanpa judul)');
 }
 
+/** Custom links (/<slug>) are routed by the Cloudflare Worker that also serves this builder. */
+const slugLinks = () => backend.name === 'cloud' && !new URLSearchParams(location.search).has('api');
+
 function shareUrl() {
+  if (state.form.slug && slugLinks()) return new URL(`/${state.form.slug}`, location.origin).href;
   const u = new URL('form.html', location.href);
   u.searchParams.set('id', state.form.id);
   const cfg = getConfig();
@@ -721,7 +725,7 @@ function designPanel() {
     el('div', { class: 'rp-section' }, el('h4', { text: 'Tata letak' }),
       field('Sudut', segmented([['none', 'Tajam'], ['small', 'Kecil'], ['large', 'Besar']], t.corners, set('corners', true))),
       field('Perataan', segmented([['left', 'Kiri'], ['center', 'Tengah']], t.align, set('align', true))),
-      toggle('Sembunyikan "Dibuat dengan FormFlow"', t, 'hideBranding', { rerender: false })),
+      toggle('Sembunyikan "Dibuat dengan Belajarlagi Form"', t, 'hideBranding', { rerender: false })),
   ];
 }
 
@@ -925,6 +929,33 @@ function pixelHint(f) {
 }
 
 // ─── Share tab ──────────────────────────────────────────────────────────────
+function slugEditor() {
+  const f = state.form;
+  const host = slugLinks() ? `${location.host}/` : 'belajarlagiform.<akun>.workers.dev/';
+  const input = el('input', {
+    type: 'text', value: f.slug || '', placeholder: cleanSlug(plainTitle(f.title)) || 'nama-form', maxlength: 50,
+    disabled: !canEdit(), 'aria-label': 'Nama link', spellcheck: false, autocomplete: 'off',
+    oninput: (e) => { const c = cleanSlug(e.target.value); if (c !== e.target.value && !/-$/.test(e.target.value)) e.target.value = c; msg.textContent = ''; },
+  });
+  const msg = el('p', { class: 'slug-msg small', role: 'status' });
+  const apply = async () => {
+    const next = cleanSlug(input.value || input.placeholder);
+    if (next === (f.slug || '')) return;
+    const problem = slugProblem(next);
+    if (problem) { msg.textContent = problem; msg.classList.add('bad'); input.focus(); return; }
+    const prev = f.slug;
+    f.slug = next; markDirty(); await save();
+    if (state.dirty && f.slug === next) { f.slug = prev; render(); }
+  };
+  return el('div', { class: 'slug-edit' },
+    el('label', { class: 'slug-field' }, el('span', { class: 'slug-host', text: host }), input),
+    canEdit() ? el('button', { class: 'btn-ghost', type: 'button', onclick: apply, text: f.slug ? 'Ganti link' : 'Pakai link ini' }) : null,
+    msg,
+    el('p', { class: 'muted small slug-hint', text: slugLinks()
+      ? 'Huruf kecil, angka, dan tanda hubung. Link lama berhenti berfungsi saat diganti, jadi tentukan sebelum form disebar.'
+      : 'Link dengan nama sendiri aktif setelah deploy ke Cloudflare. Sampai saat itu link di bawah memakai ID form.' }));
+}
+
 function renderShare() {
   const url = shareUrl();
   const origin = new URL('.', location.href).href;
@@ -932,11 +963,11 @@ function renderShare() {
   const modes = {
     inline: {
       label: 'Standar', desc: 'Form tampil di dalam halaman Anda. embed.js meneruskan event Pixel ke halaman Anda, sehingga cookie _fbp/_fbc first-party tetap terbaca.',
-      code: `<div data-formflow-inline="${url}" style="height:600px"></div>\n<script src="${origin}embed.js" async></script>`,
+      code: `<div data-belajarlagiform-inline="${url}" style="height:600px"></div>\n<script src="${origin}embed.js" async></script>`,
     },
     popup: {
       label: 'Popup', desc: 'Tombol yang membuka form di jendela popup di atas halaman Anda.',
-      code: `<script src="${origin}embed.js" async></script>\n<button data-formflow="${url}">Isi form</button>`,
+      code: `<script src="${origin}embed.js" async></script>\n<button data-belajarlagiform="${url}">Isi form</button>`,
     },
     iframe: {
       label: 'Iframe polos', desc: 'Paling sederhana, tapi Pixel berjalan di domain form, bukan domain Anda.',
@@ -951,6 +982,7 @@ function renderShare() {
       : backend.name === 'local' ? el('div', { class: 'callout warn', text: 'Mode "Browser ini saja": link hanya berfungsi di browser ini. Hubungkan backend Cloudflare atau Google Sheets di Pengaturan untuk membagikan ke publik.' }) : null,
     el('section', { class: 'card share-link' },
       el('h3', { text: 'Link form' }),
+      slugEditor(),
       el('div', { class: 'row' },
         el('input', { type: 'text', readonly: true, value: url, onclick: (e) => e.target.select(), 'aria-label': 'Link form' }),
         el('button', { class: 'btn', type: 'button', onclick: () => { copyText(url, 'Link disalin ✓'); } }, icon('copy', { size: 16 }), 'Salin'),
@@ -1268,7 +1300,7 @@ function mountAccountMenu() {
 }
 
 /** The preview's example data is rebuilt when the demo gains features (bump DEMO_VERSION). */
-const DEMO_VERSION = '3';
+const DEMO_VERSION = '4';
 function resetOutdatedDemo() {
   try {
     if (localStorage.getItem('tf_demo_version') === DEMO_VERSION) return;
@@ -1308,7 +1340,7 @@ async function init() {
   team = createTeamUI({ getBackend: () => backend, toast, confirmDialog, copyText });
   // A request answered 401 (session expired or ended by an admin): sign in again, keep unpublished edits.
   let reauth = null;
-  window.addEventListener('formflow:signed-out', () => {
+  window.addEventListener('belajarlagiform:signed-out', () => {
     reauth ||= team.signIn({ reason: 'Sesi Anda berakhir. Masuk lagi untuk melanjutkan. Perubahan yang belum terbit tetap ada.' })
       .then(async (user) => { state.user = user; reauth = null; mountAccountMenu(); await refreshPicker(); render(); });
   });

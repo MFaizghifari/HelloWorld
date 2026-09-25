@@ -17,7 +17,9 @@ async function init() {
   let form = preview ? loadDraft() : null;
   try {
     if (!form) {
-      const id = params.get('id');
+      // form.html?id=f_… or a custom link /<slug> served by the Worker.
+      const slug = location.pathname.match(/^\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])$/)?.[1];
+      const id = params.get('id') || (slug ? `slug:${slug}` : '');
       if (!id) throw new Error('Link form tidak lengkap (parameter id tidak ada).');
       form = await backend.getForm(id);
     }

@@ -154,7 +154,7 @@ test('admin gate, save, submit, results, CAPI & webhook', () => {
   assert.match(saved.sheetUrl, /docs\.google\.com/);
 
   // Per-form spreadsheet shared with valid emails only
-  const formSS = Object.values(env.files).find((f) => f.title === 'FormFlow — Tes');
+  const formSS = Object.values(env.files).find((f) => f.title === 'Belajarlagi Form — Tes');
   assert.deepEqual(formSS.editors, ['tim@belajarlagi.id']);
 
   // Public GET hides integrations (webhook URL, editors)
@@ -221,7 +221,7 @@ test('Apps Script: unfinished responses go to "Belum selesai" and are removed on
   const key = env.props.ADMIN_KEY;
   const f = { ...JSON.parse(JSON.stringify(form)), id: 'f_part01', title: 'Partial', recovery: { partials: true } };
   assert.equal(env.post({ action: 'saveForm', key, form: f }).ok, true);
-  const ss = Object.values(env.files).find((x) => x.title === 'FormFlow — Partial');
+  const ss = Object.values(env.files).find((x) => x.title === 'Belajarlagi Form — Partial');
 
   env.post({ action: 'event', formId: f.id, type: 'partial', sessionId: 's_a1', path: ['q_name1', 'q_mail1'], answers: { q_name1: '=Faiz', q_mail1: 'faiz@mail.com' }, hidden: { utm_source: 'ig' } });
   env.post({ action: 'event', formId: f.id, type: 'abandon', sessionId: 's_a1', path: ['q_name1', 'q_mail1', 'q_phon1'], answers: { q_name1: '=Faiz', q_mail1: 'faiz@mail.com', q_phon1: '0812 3456 7890' } });
@@ -250,7 +250,7 @@ test('Apps Script: uploads land in Drive, are checked by content, tied to the vi
     experiment: { id: 'x_real01', status: 'running' }, variants: { B: { questions: [{ id: 'q_name1', type: 'short_text', title: 'Nama' }] } },
   };
   assert.equal(env.post({ action: 'saveForm', key, form: f }).ok, true);
-  const ss = Object.values(env.files).find((x) => x.title === 'FormFlow — Beasiswa');
+  const ss = Object.values(env.files).find((x) => x.title === 'Belajarlagi Form — Beasiswa');
   const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]).toString('base64');
   const up = env.post({ action: 'upload', formId: f.id, questionId: 'q_ktm01', sessionId: 's_u1', name: 'ktm.png', type: 'image/png', data: png });
   assert.equal(up.ok, true, up.error);

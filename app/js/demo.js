@@ -25,6 +25,7 @@ function weighted(r, pairs) {
  */
 export function demoForm(form) {
   const f = structuredClone(form);
+  f.slug = 'pendaftaran-kelas';
   const [qName, , , qRole, qSize, qNps] = f.questions;
   const qKtm = {
     id: uid(), type: 'file_upload', title: `${'{{'}${qName.id}}}, unggah foto KTM Anda`,

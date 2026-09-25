@@ -80,7 +80,7 @@ export function createTeamUI(ctx) {
       };
       const card = (title, lede, form) => {
         host.replaceChildren(el('div', { class: 'auth-card' },
-          el('div', { class: 'auth-brand' }, el('span', { class: 'tb-logo', text: 'F' }), el('span', { text: 'FormFlow' })),
+          el('div', { class: 'auth-brand' }, el('span', { class: 'tb-logo', text: 'B' }), el('span', { text: 'Belajarlagi Form' })),
           el('h1', { text: title }),
           lede ? el('p', { class: 'auth-lede', text: lede }) : null,
           form));
@@ -114,13 +114,13 @@ export function createTeamUI(ctx) {
           el('button', { class: 'btn', type: 'submit', text: 'Masuk' }),
           el('button', { class: 'link-btn', type: 'button', onclick: showForgot, text: 'Lupa kata sandi?' }));
         handle(form, 'Masuk', (v) => backend().login(v.email, v.password));
-        card('Masuk ke FormFlow', 'Pakai akun tim Anda.', form);
+        card('Masuk ke Belajarlagi Form', 'Pakai akun tim Anda.', form);
       };
 
       const showForgot = () => {
         const out = el('div');
         const form = el('form', { class: 'auth-form' },
-          el('p', { class: 'auth-note', text: 'FormFlow tidak mengirim email. Minta admin tim membuat link reset di menu Tim → anggota → Link reset kata sandi.' }),
+          el('p', { class: 'auth-note', text: 'Belajarlagi Form tidak mengirim email. Minta admin tim membuat link reset di menu Tim → anggota → Link reset kata sandi.' }),
           el('p', { class: 'muted small', text: 'Pemilik yang lupa kata sandi: pakai admin key (secret ADMIN_KEY di Worker) untuk membuat link reset sendiri.' }),
           fieldRow('Admin key', { name: 'key', type: 'password', autocomplete: 'off', required: true }),
           fieldRow('Email akun', { name: 'email', type: 'email', required: true }),
@@ -151,7 +151,7 @@ export function createTeamUI(ctx) {
           errorLine(),
           el('button', { class: 'btn', type: 'submit', text: 'Buat akun pemilik' }));
         handle(form, 'Buat akun pemilik', (v) => backend().setup(v));
-        card('Buat akun pemilik', 'Belum ada akun di FormFlow ini. Akun pertama menjadi Pemilik, lalu Anda bisa mengundang tim.', form);
+        card('Buat akun pemilik', 'Belum ada akun di Belajarlagi Form ini. Akun pertama menjadi Pemilik, lalu Anda bisa mengundang tim.', form);
       };
 
       const showLink = async () => {
@@ -173,7 +173,7 @@ export function createTeamUI(ctx) {
           errorLine(),
           el('button', { class: 'btn', type: 'submit', text: label }));
         handle(form, label, (v) => backend().acceptInvite(token, v));
-        card(reset ? `Kata sandi baru${info.name ? ` untuk ${info.name}` : ''}` : 'Gabung ke tim FormFlow',
+        card(reset ? `Kata sandi baru${info.name ? ` untuk ${info.name}` : ''}` : 'Gabung ke tim Belajarlagi Form',
           reset ? 'Setelah disimpan, sesi di perangkat lain akan keluar.' : `Anda diundang sebagai ${roleLabel(info.role)}: ${ROLES[info.role]?.desc || ''}`, form);
       };
 
@@ -290,9 +290,9 @@ export function createTeamUI(ctx) {
           el('p', { class: 'small', text: `Link undangan untuk ${r.invite?.email || email.value} (${roleLabel(role.value)}):` }),
           linkBox(`${appUrl()}#join=${r.token}`, {
             note: simulated
-              ? 'Simulasi: di pratinjau ini link undangan hanya contoh. Setelah FormFlow di-deploy ke Cloudflare, link ini membuat akun sungguhan.'
-              : 'Berlaku 7 hari, sekali pakai. FormFlow tidak mengirim email, jadi kirim link ini sendiri. Link tidak bisa dilihat lagi setelah jendela ini ditutup.',
-            whatsappText: `Halo, Anda diundang ke tim FormFlow sebagai ${roleLabel(role.value)}. Buat akun di link ini:`,
+              ? 'Simulasi: di pratinjau ini link undangan hanya contoh. Setelah Belajarlagi Form di-deploy ke Cloudflare, link ini membuat akun sungguhan.'
+              : 'Berlaku 7 hari, sekali pakai. Belajarlagi Form tidak mengirim email, jadi kirim link ini sendiri. Link tidak bisa dilihat lagi setelah jendela ini ditutup.',
+            whatsappText: `Halo, Anda diundang ke tim Belajarlagi Form sebagai ${roleLabel(role.value)}. Buat akun di link ini:`,
           }, copyText));
         redraw();
       } catch (x) { toast(x.message, 'bad'); }
@@ -313,7 +313,7 @@ export function createTeamUI(ctx) {
             const r = await b.teamResetLink(m.id);
             view.flash = el('div', {},
               el('p', { class: 'small', text: `Link reset kata sandi untuk ${m.name || m.email} (berlaku ${r.hours} jam, sekali pakai):` }),
-              linkBox(`${appUrl()}#reset=${r.token}`, { whatsappText: 'Link untuk mengatur ulang kata sandi FormFlow Anda:', note: simulated ? 'Simulasi: link ini hanya contoh.' : '' }, copyText));
+              linkBox(`${appUrl()}#reset=${r.token}`, { whatsappText: 'Link untuk mengatur ulang kata sandi Belajarlagi Form Anda:', note: simulated ? 'Simulasi: link ini hanya contoh.' : '' }, copyText));
           }),
         }, icon('key', { size: 14 }), 'Link reset'));
         actions.push(el('button', {

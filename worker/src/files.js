@@ -70,7 +70,7 @@ export function cleanFileName(raw) {
 }
 
 function needBucket(env) {
-  if (!env.FILES) throw new HttpError(501, 'Penyimpanan file belum aktif. Buat bucket R2 "formflow-files" (lihat README), lalu deploy ulang.');
+  if (!env.FILES) throw new HttpError(501, 'Penyimpanan file belum aktif. Buat bucket R2 "belajarlagiform-files" (lihat README), lalu deploy ulang.');
 }
 
 /** Reads the request body, stopping as soon as it passes `max` bytes. */
@@ -184,7 +184,7 @@ const SAFE_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Content-Security-Po
 async function signingKey(env) {
   const secret = env.FILES_SECRET || env.ADMIN_KEY;
   if (!secret) return null;
-  return crypto.subtle.importKey('raw', new TextEncoder().encode(`formflow-files:${secret}`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(`belajarlagiform-files:${secret}`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 }
 
 async function signature(key, path, exp) {
@@ -217,8 +217,8 @@ function loginPage(status) {
   const html = `<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Masuk dulu</title>
 <body style="font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 16px;color:#060B14">
 <h1 style="font-size:22px">File ini hanya untuk tim</h1>
-<p>Masuk ke FormFlow dengan akun tim Anda, lalu buka link ini lagi.</p>
-<p><a href="/index.html" style="color:#3967BD;font-weight:700">Masuk ke FormFlow →</a></p></body></html>`;
+<p>Masuk ke Belajarlagi Form dengan akun tim Anda, lalu buka link ini lagi.</p>
+<p><a href="/index.html" style="color:#3967BD;font-weight:700">Masuk ke Belajarlagi Form →</a></p></body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SAFE_HEADERS, 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" } });
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "formflow",
+  "name": "belajarlagiform",
   "version": "1.0.0",
   "private": true,
   "description": "Typeform-style form builder with logic jumps, Meta Pixel + Conversions API, GA4/GTM, analytics dashboard, and a Google Sheets backend.",

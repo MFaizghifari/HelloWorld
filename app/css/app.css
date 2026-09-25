@@ -1,4 +1,4 @@
-/* FormFlow app chrome (builder + results).
+/* Belajarlagi Form app chrome (builder + results).
    Belajarlagi tokens: blue = actions and data marks, yellow = highlights only
    (status dot, "example data" tag, biggest drop-off), Satoshi, 16px cards. */
 :root {
@@ -312,6 +312,16 @@ input[type=color] { padding: 0; }
 .logic-add { margin-left: 12px; }
 
 .share-link .row input { flex: 1; min-width: 220px; }
+.slug-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.slug-field { flex: 1; min-width: 260px; display: flex; align-items: center; height: 44px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--panel); overflow: hidden; }
+.slug-field:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
+.slug-host { padding: 0 2px 0 14px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; font-size: 14px; }
+.slug-field input { flex: 1; min-width: 0; height: 100%; border: 0; padding: 0 12px 0 0; background: transparent; box-shadow: none; font-weight: 600; }
+.slug-field input:focus { outline: none; box-shadow: none; }
+.slug-msg { flex-basis: 100%; margin: -4px 0 0; }
+.slug-msg:empty { display: none; }
+.slug-msg.bad { color: var(--bad, #c0392b); }
+.slug-hint { flex-basis: 100%; margin: -4px 0 0; }
 .embed-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
 .embed-mode { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px 12px 14px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--panel); cursor: pointer; font: inherit; }
 .embed-mode strong { font-size: 14px; }

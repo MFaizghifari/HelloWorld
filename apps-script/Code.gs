@@ -1,5 +1,5 @@
 /**
- * FormFlow backend — Google Apps Script Web App → Google Sheets.
+ * Belajarlagi Form backend — Google Apps Script Web App → Google Sheets.
  *
  * One registry spreadsheet stores form definitions; every form gets its own
  * spreadsheet with two tabs: "Responses" (one row per submission) and
@@ -8,7 +8,7 @@
  * responses that already contain an email or phone number).
  *
  * Files uploaded by respondents go to a private Google Drive folder per form
- * ("FormFlow Uploads"), shared with the form's sheet editors; the "Uploads"
+ * ("Belajarlagi Form Uploads"), shared with the form's sheet editors; the "Uploads"
  * tab tracks them so files of visits that never submit are deleted after a day.
  * Team accounts need the Cloudflare backend; here the admin key is the login.
  *
@@ -167,7 +167,7 @@ function registry_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('REGISTRY_ID');
   if (id) return SpreadsheetApp.openById(id).getSheetByName('Forms');
-  var ss = SpreadsheetApp.create('FormFlow — Registry');
+  var ss = SpreadsheetApp.create('Belajarlagi Form — Registry');
   moveToFolder_(ss.getId());
   var sh = ss.getSheets()[0].setName('Forms');
   sh.appendRow(['id', 'title', 'sheetId', 'updatedAt', 'json']);
@@ -242,7 +242,7 @@ function saveForm_(form) {
     var sheetId = row === -1 ? '' : sh.getRange(row, 3).getValue();
     var ss;
     if (!sheetId) {
-      ss = SpreadsheetApp.create('FormFlow — ' + (form.title || form.id));
+      ss = SpreadsheetApp.create('Belajarlagi Form — ' + (form.title || form.id));
       moveToFolder_(ss.getId());
       var resp = ss.getSheets()[0].setName('Responses');
       resp.getRange(1, 1, 1, 2).setValues([['Submitted At', 'Response ID']]).setFontWeight('bold');
@@ -623,7 +623,7 @@ function folder_(name, parentId) {
 
 /** Private folder per form, shared (view) with the form's sheet editors. */
 function uploadsFolder_(form) {
-  var root = folder_('FormFlow Uploads', prop_('DRIVE_FOLDER_ID'));
+  var root = folder_('Belajarlagi Form Uploads', prop_('DRIVE_FOLDER_ID'));
   var f = folder_((form.title || form.id).slice(0, 80) + ' (' + form.id + ')', root.getId());
   var emails = sheetEditors_(form);
   if (emails.length) {
@@ -725,7 +725,7 @@ function media_(body) {
   if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error('Gambar maksimal 5 MB.');
   var type = detectType_(bytes, name);
   if (['image/jpeg', 'image/png', 'image/gif', 'image/webp'].indexOf(type) === -1) throw new Error('Gambar harus JPG, PNG, GIF, atau WebP.');
-  var file = folder_('FormFlow Media', prop_('DRIVE_FOLDER_ID')).createFile(Utilities.newBlob(bytes, type, name));
+  var file = folder_('Belajarlagi Form Media', prop_('DRIVE_FOLDER_ID')).createFile(Utilities.newBlob(bytes, type, name));
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return { ok: true, url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w2000' };
 }

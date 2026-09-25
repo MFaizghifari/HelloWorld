@@ -94,3 +94,13 @@ test('contact detection and WhatsApp links for follow-up', () => {
   assert.equal(whatsappLink('123'), '');
   assert.deepEqual(cleanPartialAnswers(f, { n: 'Faiz', e: 'bad', c: 'Z', x: 1 }), { n: 'Faiz' });
 });
+
+test('custom link names', async () => {
+  const { cleanSlug, slugProblem } = await import('../app/js/logic.js');
+  assert.equal(cleanSlug('  Beasiswa S2 — Jakarta 2026! '), 'beasiswa-s2-jakarta-2026');
+  assert.equal(cleanSlug('Kelas Café'), 'kelas-cafe');
+  assert.equal(slugProblem('kelas-excel'), null);
+  assert.match(slugProblem('ab'), /minimal/);
+  assert.match(slugProblem('dashboard'), /sistem/);
+  assert.match(slugProblem('-kelas'), /huruf kecil/);
+});

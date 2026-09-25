@@ -2,18 +2,18 @@
 // Priority (highest first):
 //   1. ?api= in a share link (only Google Apps Script URLs or this same origin)
 //   2. The builder's "Pengaturan" panel (stored in this browser only)
-//   3. window.FORMFLOW_CONFIG — injected by the Cloudflare Worker via /formflow-config.js
+//   3. window.BELAJARLAGIFORM_CONFIG — injected by the Cloudflare Worker via /belajarlagiform-config.js
 //   4. DEFAULT_CONFIG below — edit this when hosting the static files elsewhere
 export const DEFAULT_CONFIG = {
   backend: 'local', // 'local' (browser only, demo) | 'sheets' (Apps Script) | 'cloud' (Cloudflare Worker + D1)
   sheetsUrl: '', // e.g. 'https://script.google.com/macros/s/AKfy.../exec'
-  apiUrl: '', // Cloudflare Worker API, e.g. '/api' or 'https://formflow.example.workers.dev/api'
+  apiUrl: '', // Cloudflare Worker API, e.g. '/api' or 'https://belajarlagiform.example.workers.dev/api'
 };
 
 const KEY = 'tf_config';
 
 export function serverConfig() {
-  const c = typeof window !== 'undefined' ? window.FORMFLOW_CONFIG : null;
+  const c = typeof window !== 'undefined' ? window.BELAJARLAGIFORM_CONFIG : null;
   return c && typeof c === 'object' ? c : {};
 }
 

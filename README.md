@@ -1,4 +1,4 @@
-# FormFlow
+# Belajarlagi Form
 
 Form builder bergaya Typeform: satu pertanyaan per layar, logic jump, Facebook/Meta Pixel + Conversions API, GA4/GTM, dashboard visualisasi, dengan dua pilihan backend:
 
@@ -69,16 +69,16 @@ Butuh akun Cloudflare (gratis) dan Node.js 20+.
 cd worker
 npm install
 npx wrangler login
-npx wrangler d1 create formflow --location apac   # salin database_id ke wrangler.toml
-npx wrangler r2 bucket create formflow-files      # penyimpanan file upload & gambar form
+npx wrangler d1 create belajarlagiform --location apac   # salin database_id ke wrangler.toml
+npx wrangler r2 bucket create belajarlagiform-files      # penyimpanan file upload & gambar form
 npm run db:migrate                                # buat tabel di D1
 openssl rand -base64 32 | npx wrangler secret put ADMIN_KEY   # kunci acak 32 byte: membuat akun Pemilik (dan pemulihan akun)
-npm run deploy                                    # → https://formflow.<akun>.workers.dev
+npm run deploy                                    # → https://belajarlagiform.<akun>.workers.dev
 ```
 
 Buka URL itu. Builder meminta admin key sekali untuk membuat **akun Pemilik**, lalu Anda bisa mengundang tim (lihat [Akun tim dan peran](#akun-tim-dan-peran)). Backend "Cloudflare D1" sudah terpilih otomatis. Custom domain (mis. `form.belajarlagi.id`) bisa ditambahkan di dashboard Cloudflare → Workers → Settings → Domains.
 
-**Deployment yang sudah berjalan:** jalankan `npm run db:migrate` (membuat tabel `users`, `auth_sessions`, `invites`, `audit_log`, `uploads`, `segments` dari `migrations/0003_team_files_segments.sql`), buat bucket R2 di atas, lalu `npm run deploy`. Setelah itu builder meminta login; admin key lama tetap berlaku untuk API/otomasi.
+**Deployment yang sudah berjalan:** jalankan `npm run db:migrate` (membuat tabel `users`, `auth_sessions`, `invites`, `audit_log`, `uploads`, `segments` dari `migrations/0003_team_files_segments.sql`), buat bucket R2 di atas, lalu `npm run deploy`. Setelah itu builder meminta login; admin key lama tetap berlaku untuk API/otomasi. Migrasi `0004_form_slugs.sql` menambah kolom `slug` untuk link form dengan nama sendiri.
 
 **Secret opsional** (`npx wrangler secret put NAMA`):
 
@@ -160,7 +160,7 @@ Di backend Cloudflare, setiap anggota tim masuk dengan email dan kata sandinya s
 | Pindahkan kepemilikan | ✓ | – | – | – |
 
 - **Peran ditegakkan di server.** Tombol yang disembunyikan di builder hanya kenyamanan; Worker menolak aksi di luar peran dengan HTTP 403, juga untuk sesi yang sudah terbuka saat perannya diturunkan.
-- **Undangan dan reset kata sandi memakai link sekali pakai** (undangan 7 hari, reset 24 jam). FormFlow tidak mengirim email, jadi admin menyalin link atau mengirimnya lewat tombol WhatsApp. Pemilik yang lupa kata sandi membuat link reset sendiri dengan admin key dari halaman masuk.
+- **Undangan dan reset kata sandi memakai link sekali pakai** (undangan 7 hari, reset 24 jam). Belajarlagi Form tidak mengirim email, jadi admin menyalin link atau mengirimnya lewat tombol WhatsApp. Pemilik yang lupa kata sandi membuat link reset sendiri dengan admin key dari halaman masuk.
 - **Link ikut hak pembuatnya.** Saat link dipakai, server memeriksa ulang bahwa pembuatnya masih anggota dan masih boleh memberi peran itu (atau mengelola anggota itu). Link yang dibuat oleh atau untuk seseorang langsung batal saat perannya diubah, ia dikeluarkan, atau kepemilikan dipindahkan; link reset batal saat pemiliknya mengganti kata sandi. Semua link yang masih terbuka, termasuk link reset, terlihat di menu Tim dan bisa dibatalkan.
 - **GTM hanya untuk Admin dan Pemilik.** Container GTM bisa menjalankan skrip apa pun di domain builder, tempat sesi login tersimpan. Editor tetap bisa mengatur Pixel dan GA4 (ID-nya divalidasi ketat), tapi perubahan GTM Container ID ditolak server (HTTP 403). Untuk isolasi penuh, sajikan form responden di domain terpisah dari builder (mis. `isi.belajarlagi.id` dan `admin.belajarlagi.id`).
 - **Admin key:** buat dengan `openssl rand -base64 32` (256 bit). Tebakan admin key ikut rate limit login (10/menit per IP).
@@ -210,12 +210,30 @@ Setiap kunjungan dicatat dengan perangkat dan sumbernya, lalu tab Hasil menampil
 - **Sumber:** `utm_source` (ejaan umum disatukan, mis. `ig` → instagram), lalu `fbclid` (dilaporkan sebagai "meta", karena Meta menambahkannya untuk Facebook maupun Instagram), `gclid`, `ttclid`, lalu situs perujuk, lalu "(langsung)". `embed.js` meneruskan asal pengunjung halaman Anda (`_ref`), sehingga form yang ditanam tidak mencatat situs Anda sendiri sebagai sumber.
 - Di Cloudflare, segmen dihitung di tabel `segments` (seperti tabel agregat lain), jadi dashboard tetap tidak memindai data mentah.
 
+## Link form dengan nama sendiri
+
+Alamat aplikasi mengikuti nama Worker di `worker/wrangler.toml` (`name = "belajarlagiform"`), jadi setelah deploy builder dan form ada di `https://belajarlagiform.<subdomain-akun>.workers.dev`. `<subdomain-akun>` adalah subdomain workers.dev akun Cloudflare Anda (bisa diganti di dashboard → Workers & Pages → Subdomain) ([workers.dev docs](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)).
+
+Tiap form bisa diberi nama link di tab **Bagikan**, misalnya:
+
+| Sebelum | Sesudah |
+|---|---|
+| `…workers.dev/form.html?id=f_m3k9x2abcd` | `…workers.dev/beasiswa-2026` |
+
+- Huruf kecil, angka, dan tanda hubung; 3–50 karakter. Judul form otomatis diusulkan (`Beasiswa S2 — Jakarta 2026` → `beasiswa-s2-jakarta-2026`).
+- Satu nama hanya untuk satu form (server menolak duplikat dengan HTTP 409). Nama yang dipakai sistem (`api`, `dashboard`, `form`, `css`, dll.) ditolak.
+- Mengganti nama membuat link lama berhenti berfungsi (404), jadi tentukan sebelum form disebar. Link `form.html?id=…` tetap berlaku selamanya.
+- Parameter iklan tetap terbaca: `…/beasiswa-2026?utm_source=instagram` tercatat sebagai sumber "instagram".
+- Hanya di backend Cloudflare. Di Apps Script dan mode lokal, link tetap memakai ID form.
+
+**Link paling rapi: domain sendiri.** Jika domain `belajarlagi.id` dikelola di Cloudflare, tambahkan custom domain untuk Worker (dashboard → Workers → belajarlagiform → Settings → Domains & Routes → Add → Custom domain), misalnya `form.belajarlagi.id`. Link menjadi `https://form.belajarlagi.id/beasiswa-2026`. Sertifikat HTTPS dibuat otomatis tanpa biaya tambahan ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)). Builder yang dibuka dari domain itu otomatis membuat link dengan domain itu.
+
 ## Embed di website
 
 Tab **Bagikan** menghasilkan 3 snippet. Disarankan memakai `embed.js`:
 
 ```html
-<div data-formflow-inline="https://…/form.html?id=f_xxx" style="height:600px"></div>
+<div data-belajarlagiform-inline="https://…/form.html?id=f_xxx" style="height:600px"></div>
 <script src="https://…/embed.js" async></script>
 ```
 
@@ -223,11 +241,11 @@ Kenapa tidak iframe polos saja? Safari (ITP) dan Chrome membatasi cookie pihak k
 - meneruskan UTM/fbclid dari URL halaman Anda ke form,
 - mengirim cookie `_fbp`/`_fbc` first-party ke form (untuk matching CAPI),
 - jika halaman Anda sudah punya Pixel, event form ditembakkan dari Pixel halaman Anda dan Pixel di iframe dimatikan (tidak dobel hitung),
-- memancarkan event DOM `formflow:Lead`, `formflow:FormStart`, dst. untuk kebutuhan custom.
+- memancarkan event DOM `belajarlagiform:Lead`, `belajarlagiform:FormStart`, dst. untuk kebutuhan custom.
 
 ## Kapasitas: 30.000 isian/bulan
 
-**Asumsi:** completion rate 30% → ±100.000 pengunjung/bulan. Tiap pengunjung memicu ±3 request API (view, start, submit/abandon) ditambah 1 request `formflow-config.js`.
+**Asumsi:** completion rate 30% → ±100.000 pengunjung/bulan. Tiap pengunjung memicu ±3 request API (view, start, submit/abandon) ditambah 1 request `belajarlagiform-config.js`.
 
 ### Cloudflare Workers + D1
 
@@ -284,9 +302,9 @@ Selain itu, alur builder → form → dashboard → ekspor CSV dan alur pemuliha
 - Belum diuji di akun Cloudflare, Google Cloud, dan Meta sungguhan. Yang sudah diuji: runtime workerd/D1 lokal, SQLite, dan mock HTTP. Sebelum menjalankan iklan: deploy, isi satu form, cek *Test events* di Meta, dan pastikan baris muncul di Google Sheet dalam 5 menit.
 - Email notifikasi hanya ada di backend Apps Script. Di Cloudflare, pakai webhook (Slack, Telegram, Make, n8n).
 - Belum ada pembayaran atau multi-bahasa. Uji A/B hanya dua varian (A dan B).
-- FormFlow tidak mengirim email: undangan tim dan reset kata sandi berupa link yang dikirim sendiri.
+- Belajarlagi Form tidak mengirim email: undangan tim dan reset kata sandi berupa link yang dikirim sendiri.
 - Akun tim hanya ada di backend Cloudflare. Di Apps Script, admin key disimpan di `localStorage` browser admin; jangan gunakan builder di komputer bersama.
 - Upload ke Google Drive (Apps Script) baru diuji dengan mock, belum di akun Google sungguhan.
-- Di host selain Worker (mis. GitHub Pages), browser mencatat 404 untuk `formflow-config.js`. Ini tidak berbahaya.
+- Di host selain Worker (mis. GitHub Pages), browser mencatat 404 untuk `belajarlagiform-config.js`. Ini tidak berbahaya.
 - Parameter `?api=` di link hanya berlaku di halaman form responden, bukan di builder, supaya link buatan orang lain tidak bisa mengarahkan admin key atau token login ke server lain.
 - Sumber traffic ditampilkan 25 teratas; sisanya digabung menjadi "(lainnya)" agar dashboard tetap ringan meski `utm_source` diisi sembarang.

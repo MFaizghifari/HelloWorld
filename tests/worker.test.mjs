@@ -31,7 +31,7 @@ test('admin gate, public form hides integrations, validation, idempotent submit,
   const saved = await api(env, { action: 'saveForm', key: 'secret-key', form });
   assert.equal(saved.ok, true, saved.error);
 
-  const pub = await worker.fetch(new Request('https://formflow.test/api?action=getForm&id=f_test01'), env, {});
+  const pub = await worker.fetch(new Request('https://belajarlagiform.test/api?action=getForm&id=f_test01'), env, {});
   const pubBody = await pub.json();
   assert.equal(pubBody.form.integrations, undefined);
   assert.equal(pub.headers.get('Access-Control-Allow-Origin'), '*');
@@ -233,7 +233,7 @@ test('Google Sheets sync: header, RAW append, retry after failure, column stabil
 
 test('worker serves config script and falls back to assets', async () => {
   const env = makeEnv({ ASSETS: { fetch: async () => new Response('asset') } });
-  const cfg = await worker.fetch(new Request('https://x.test/formflow-config.js'), env, {});
+  const cfg = await worker.fetch(new Request('https://x.test/belajarlagiform-config.js'), env, {});
   assert.match(await cfg.text(), /backend:"cloud",apiUrl:"\/api"/);
   const page = await worker.fetch(new Request('https://x.test/form.html'), env, {});
   assert.equal(await page.text(), 'asset');
@@ -305,4 +305,30 @@ test('A/B: answers are checked against the variant the visitor saw; forged varia
   assert.equal(a.a.q_only_b, undefined, 'variant A never showed that question');
   assert.equal(b.a.q_only_b, 'Medan');
   assert.equal(b.m.variant, 'x_real01:B');
+});
+
+test('custom form links: validated, unique, looked up by slug, served at /<slug>', async () => {
+  const { makeEnv: mk, api: call } = await import('./support.mjs');
+  const env = mk({ ASSETS: { fetch: async (req) => new Response(`asset:${new URL(req.url).pathname}`, { headers: { 'Content-Type': 'text/html' } }) } });
+  const a = { id: 'f_slug01', title: 'Beasiswa 2026', questions: [{ id: 'q_name', type: 'short_text', title: 'Nama' }] };
+  const b = { ...a, id: 'f_slug02', title: 'Kelas Excel' };
+  const saved = await call(env, { action: 'saveForm', key: 'secret-key', form: { ...a, slug: ' Beasiswa 2026 ' } });
+  assert.equal(saved.form.slug, 'beasiswa-2026', 'cleaned on save');
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...b, slug: 'beasiswa-2026' } })).status, 409);
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...b, slug: 'api' } })).status, 400, 'reserved');
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...b, slug: 'ab' } })).status, 400, 'too short');
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: b })).ok, true, 'no slug is fine, for many forms');
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...a, id: 'f_slug03' } })).ok, true);
+
+  const bySlug = await (await worker.fetch(new Request('https://x.test/api?action=getForm&slug=beasiswa-2026'), env, {})).json();
+  assert.equal(bySlug.form.id, 'f_slug01');
+  assert.equal((await worker.fetch(new Request('https://x.test/api?action=getForm&slug=tidak-ada'), env, {})).status, 404);
+  const page = await worker.fetch(new Request('https://x.test/beasiswa-2026?utm_source=ig'), env, {});
+  assert.equal(await page.text(), 'asset:/form.html');
+  assert.equal(await (await worker.fetch(new Request('https://x.test/tidak-ada'), env, {})).text(), 'asset:/tidak-ada', 'unknown paths fall through to static files');
+  assert.equal((await call(env, { action: 'listForms', key: 'secret-key' })).forms.find((f) => f.id === 'f_slug01').slug, 'beasiswa-2026');
+
+  // Renaming frees the old link for another form.
+  await call(env, { action: 'saveForm', key: 'secret-key', form: { ...a, slug: 'beasiswa-2027' } });
+  assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...b, slug: 'beasiswa-2026' } })).ok, true);
 });

@@ -24,14 +24,14 @@ const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
 const stylesheets = [...head.matchAll(/<link rel="stylesheet" href="(css\/[^"]+)">/g)].map((m) => `<link rel="stylesheet" href="${m[1]}">`);
 
 const page = [
-  '<title>FormFlow Builder</title>',
+  '<title>Belajarlagi Form Builder</title>',
   // Satoshi (Fontshare) is blocked by the Artifact CSP; DM Sans is the nearest Google Fonts fallback.
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">',
   ...stylesheets,
   '<style>html, body { height: 100%; } body { background: #FCFCFC; font-family: \'Satoshi\', \'DM Sans\', system-ui, sans-serif; } .builder { height: 100%; }</style>',
-  '<script>window.FORMFLOW_CONFIG = { backend: \'local\', demo: true };</script>',
+  '<script>window.BELAJARLAGIFORM_CONFIG = { backend: \'local\', demo: true };</script>',
   body
-    .replace(/\s*<!-- Served by the Cloudflare Worker[^>]*-->\s*<script src="formflow-config.js"><\/script>/, '\n')
+    .replace(/\s*<!-- Served by the Cloudflare Worker[^>]*-->\s*<script src="belajarlagiform-config.js"><\/script>/, '\n')
     .trim(),
 ].join('\n');
 

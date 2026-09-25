@@ -48,19 +48,19 @@ export function makeEnv(extra = {}) {
 
 /** POST /api with a JSON body; returns { status, headers, ...body }. */
 export async function api(env, body, { ip = '203.0.113.9', waits = [], headers = {} } = {}) {
-  const req = new Request('https://formflow.test/api', { method: 'POST', body: JSON.stringify(body), headers: { 'CF-Connecting-IP': ip, ...headers } });
+  const req = new Request('https://belajarlagiform.test/api', { method: 'POST', body: JSON.stringify(body), headers: { 'CF-Connecting-IP': ip, ...headers } });
   const res = await worker.fetch(req, env, { waitUntil: (p) => waits.push(p) });
   return { status: res.status, headers: res.headers, ...(await res.json()) };
 }
 
 export async function get(env, path, headers = {}) {
-  return worker.fetch(new Request(`https://formflow.test${path}`, { headers }), env, {});
+  return worker.fetch(new Request(`https://belajarlagiform.test${path}`, { headers }), env, {});
 }
 
 export async function upload(env, path, bytes, headers = {}) {
   const init = { method: 'POST', body: bytes, headers: { 'CF-Connecting-IP': '203.0.113.9', ...headers } };
   if (bytes instanceof ReadableStream) init.duplex = 'half'; // streamed body without Content-Length
-  return worker.fetch(new Request(`https://formflow.test${path}`, init), env, {});
+  return worker.fetch(new Request(`https://belajarlagiform.test${path}`, init), env, {});
 }
 
 // Smallest valid files for the type sniffer.
