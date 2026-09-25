@@ -73,10 +73,10 @@ npx wrangler d1 create belajarlagiform --location apac   # salin database_id ke 
 npx wrangler r2 bucket create belajarlagiform-files      # penyimpanan file upload & gambar form
 npm run db:migrate                                # buat tabel di D1
 openssl rand -base64 32 | npx wrangler secret put ADMIN_KEY   # kunci acak 32 byte: membuat akun Pemilik (dan pemulihan akun)
-npm run deploy                                    # → https://belajarlagiform.<akun>.workers.dev
+npm run deploy                                    # → https://form.belajarlagi.id (lihat "Domain form.belajarlagi.id")
 ```
 
-Buka URL itu. Builder meminta admin key sekali untuk membuat **akun Pemilik**, lalu Anda bisa mengundang tim (lihat [Akun tim dan peran](#akun-tim-dan-peran)). Backend "Cloudflare D1" sudah terpilih otomatis. Custom domain (mis. `form.belajarlagi.id`) bisa ditambahkan di dashboard Cloudflare → Workers → Settings → Domains.
+Buka `https://form.belajarlagi.id`. Builder meminta admin key sekali untuk membuat **akun Pemilik**, lalu Anda bisa mengundang tim (lihat [Akun tim dan peran](#akun-tim-dan-peran)). Backend "Cloudflare D1" sudah terpilih otomatis.
 
 **Deployment yang sudah berjalan:** jalankan `npm run db:migrate` (membuat tabel `users`, `auth_sessions`, `invites`, `audit_log`, `uploads`, `segments` dari `migrations/0003_team_files_segments.sql`), buat bucket R2 di atas, lalu `npm run deploy`. Setelah itu builder meminta login; admin key lama tetap berlaku untuk API/otomasi. Migrasi `0004_form_slugs.sql` menambah kolom `slug` untuk link form dengan nama sendiri.
 
@@ -212,21 +212,38 @@ Setiap kunjungan dicatat dengan perangkat dan sumbernya, lalu tab Hasil menampil
 
 ## Link form dengan nama sendiri
 
-Alamat aplikasi mengikuti nama Worker di `worker/wrangler.toml` (`name = "belajarlagiform"`), jadi setelah deploy builder dan form ada di `https://belajarlagiform.<subdomain-akun>.workers.dev`. `<subdomain-akun>` adalah subdomain workers.dev akun Cloudflare Anda (bisa diganti di dashboard → Workers & Pages → Subdomain) ([workers.dev docs](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)).
-
 Tiap form bisa diberi nama link di tab **Bagikan**, misalnya:
 
 | Sebelum | Sesudah |
 |---|---|
-| `…workers.dev/form.html?id=f_m3k9x2abcd` | `…workers.dev/beasiswa-2026` |
+| `form.belajarlagi.id/form.html?id=f_m3k9x2abcd` | `form.belajarlagi.id/beasiswa-2026` |
 
 - Huruf kecil, angka, dan tanda hubung; 3–50 karakter. Judul form otomatis diusulkan (`Beasiswa S2 — Jakarta 2026` → `beasiswa-s2-jakarta-2026`).
 - Satu nama hanya untuk satu form (server menolak duplikat dengan HTTP 409). Nama yang dipakai sistem (`api`, `dashboard`, `form`, `css`, dll.) ditolak.
 - Mengganti nama membuat link lama berhenti berfungsi (404), jadi tentukan sebelum form disebar. Link `form.html?id=…` tetap berlaku selamanya.
-- Parameter iklan tetap terbaca: `…/beasiswa-2026?utm_source=instagram` tercatat sebagai sumber "instagram".
+- Parameter iklan tetap terbaca: `form.belajarlagi.id/beasiswa-2026?utm_source=instagram` tercatat sebagai sumber "instagram".
 - Hanya di backend Cloudflare. Di Apps Script dan mode lokal, link tetap memakai ID form.
 
-**Link paling rapi: domain sendiri.** Jika domain `belajarlagi.id` dikelola di Cloudflare, tambahkan custom domain untuk Worker (dashboard → Workers → belajarlagiform → Settings → Domains & Routes → Add → Custom domain), misalnya `form.belajarlagi.id`. Link menjadi `https://form.belajarlagi.id/beasiswa-2026`. Sertifikat HTTPS dibuat otomatis tanpa biaya tambahan ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)). Builder yang dibuka dari domain itu otomatis membuat link dengan domain itu.
+### Domain form.belajarlagi.id
+
+Semua link yang dibagikan memakai `https://form.belajarlagi.id/<nama-link>`. Ini sudah diatur di `worker/wrangler.toml`:
+
+```toml
+routes = [{ pattern = "form.belajarlagi.id", custom_domain = true }]   # di bagian atas file
+
+[vars]
+PUBLIC_URL = "https://form.belajarlagi.id"
+```
+
+Saat `npm run deploy`, Cloudflare membuat record DNS dan sertifikat HTTPS untuk `form.belajarlagi.id` secara otomatis, tanpa biaya tambahan ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)). Syaratnya:
+
+1. **Domain `belajarlagi.id` dikelola di akun Cloudflare yang sama** (nameserver domain mengarah ke Cloudflare; paket Free cukup). Cek di dashboard → Websites. Jika domain masih di DNS lain, pindahkan nameserver-nya dulu, atau untuk sementara hapus baris `routes` dan `PUBLIC_URL`, maka aplikasi jalan di `belajarlagiform.<akun>.workers.dev`.
+2. **Belum ada record DNS `form`** di zona itu. Cloudflare menolak custom domain jika sudah ada record dengan nama yang sama; hapus dulu jika pernah dibuat.
+
+Setelah itu:
+- Halaman yang dibuka lewat `*.workers.dev` dialihkan (301) ke `form.belajarlagi.id` dengan path dan parameter UTM tetap utuh, jadi tim selalu login di satu domain (cookie file dan sesi tidak terpecah). API tetap menjawab di kedua alamat.
+- **Meta Pixel:** verifikasi domain di Business Manager dilakukan per domain utama (eTLD+1). Jika `belajarlagi.id` sudah terverifikasi, `form.belajarlagi.id` ikut tercakup, dan cookie `_fbp` tetap first-party di domain Belajarlagi ([Meta: Verifikasi domain](https://www.facebook.com/business/help/286768115176155)).
+- Di pratinjau dan mode lokal, kolom nama link sudah menampilkan `form.belajarlagi.id/` sebagai contoh alamat akhirnya.
 
 ## Embed di website
 

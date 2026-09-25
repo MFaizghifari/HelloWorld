@@ -931,7 +931,7 @@ function pixelHint(f) {
 // ─── Share tab ──────────────────────────────────────────────────────────────
 function slugEditor() {
   const f = state.form;
-  const host = slugLinks() ? `${location.host}/` : 'belajarlagiform.<akun>.workers.dev/';
+  const host = `${slugLinks() ? location.host : getConfig().publicHost || 'belajarlagiform.<akun>.workers.dev'}/`;
   const input = el('input', {
     type: 'text', value: f.slug || '', placeholder: cleanSlug(plainTitle(f.title)) || 'nama-form', maxlength: 50,
     disabled: !canEdit(), 'aria-label': 'Nama link', spellcheck: false, autocomplete: 'off',

@@ -2,6 +2,11 @@ name = "belajarlagiform"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 
+# Shared links live on your own domain. Needs the belajarlagi.id zone in this
+# Cloudflare account; `npm run deploy` then creates the DNS record and HTTPS
+# certificate for form.belajarlagi.id. Pages opened on *.workers.dev redirect here.
+routes = [{ pattern = "form.belajarlagi.id", custom_domain = true }]
+
 # The builder, form and dashboard (../app) are served from the same Worker,
 # so the API lives on the same origin at /api.
 [assets]
@@ -20,6 +25,7 @@ migrations_dir = "migrations"
 crons = ["*/5 * * * *"]
 
 [vars]
+PUBLIC_URL = "https://form.belajarlagi.id"
 # Day boundaries for the dashboard. 420 = WIB (UTC+7), 480 = WITA, 540 = WIT.
 TZ_OFFSET_MINUTES = "420"
 

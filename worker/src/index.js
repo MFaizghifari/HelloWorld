@@ -497,6 +497,14 @@ const AUTH_ACTIONS = {
   teamTransferOwner: auth.teamTransferOwner,
 };
 
+/** PUBLIC_URL as a bare https origin, or null when unset or malformed. */
+function publicOrigin(env) {
+  try {
+    const u = new URL(String(env.PUBLIC_URL || ''));
+    return u.protocol === 'https:' ? u.origin : null;
+  } catch { return null; }
+}
+
 /** The form page's HTML, served under a custom link (following the assets' own .html → clean-URL redirect). */
 async function formPage(env, url) {
   let res = await env.ASSETS.fetch(new Request(new URL('/form.html', url)));
@@ -555,6 +563,13 @@ async function withErrors(run) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // One public address (e.g. form.belajarlagi.id): pages opened on *.workers.dev move
+    // there, so logins, file cookies and Pixel cookies all live on the same domain.
+    // The API keeps answering on both, for embeds made before the switch.
+    const home = publicOrigin(env);
+    if (home && url.hostname.endsWith('.workers.dev') && url.origin !== home && (request.method === 'GET' || request.method === 'HEAD') && !url.pathname.startsWith('/api')) {
+      return Response.redirect(`${home}${url.pathname}${url.search}`, 301);
+    }
     if (url.pathname === '/api' || url.pathname === '/api/') return withErrors(() => handleApi(request, env, ctx));
     if (url.pathname === '/api/upload') {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });

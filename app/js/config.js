@@ -8,6 +8,7 @@ export const DEFAULT_CONFIG = {
   backend: 'local', // 'local' (browser only, demo) | 'sheets' (Apps Script) | 'cloud' (Cloudflare Worker + D1)
   sheetsUrl: '', // e.g. 'https://script.google.com/macros/s/AKfy.../exec'
   apiUrl: '', // Cloudflare Worker API, e.g. '/api' or 'https://belajarlagiform.example.workers.dev/api'
+  publicHost: 'form.belajarlagi.id', // where shared links live once deployed (PUBLIC_URL in worker/wrangler.toml)
 };
 
 const KEY = 'tf_config';

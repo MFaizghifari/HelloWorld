@@ -332,3 +332,17 @@ test('custom form links: validated, unique, looked up by slug, served at /<slug>
   await call(env, { action: 'saveForm', key: 'secret-key', form: { ...a, slug: 'beasiswa-2027' } });
   assert.equal((await call(env, { action: 'saveForm', key: 'secret-key', form: { ...b, slug: 'beasiswa-2026' } })).ok, true);
 });
+
+test('pages on workers.dev move to PUBLIC_URL; the API keeps answering on both', async () => {
+  const { makeEnv: mk } = await import('./support.mjs');
+  const env = mk({ PUBLIC_URL: 'https://form.belajarlagi.id', ASSETS: { fetch: async () => new Response('asset') } });
+  const page = await worker.fetch(new Request('https://belajarlagiform.tim.workers.dev/beasiswa-2026?utm_source=ig'), env, {});
+  assert.equal(page.status, 301);
+  assert.equal(page.headers.get('Location'), 'https://form.belajarlagi.id/beasiswa-2026?utm_source=ig', 'path and UTM kept');
+  const apiRes = await worker.fetch(new Request('https://belajarlagiform.tim.workers.dev/api?action=health'), env, {});
+  assert.equal(apiRes.status, 200);
+  assert.equal((await worker.fetch(new Request('https://form.belajarlagi.id/index.html'), env, {})).status, 200, 'no loop on the public domain');
+  assert.equal((await worker.fetch(new Request('http://127.0.0.1:8787/index.html'), env, {})).status, 200, 'local dev is untouched');
+  const bad = mk({ PUBLIC_URL: 'http://tidak-aman.id', ASSETS: { fetch: async () => new Response('asset') } });
+  assert.equal((await worker.fetch(new Request('https://x.workers.dev/index.html'), bad, {})).status, 200, 'non-https PUBLIC_URL is ignored');
+});
