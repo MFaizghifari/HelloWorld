@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Belajarlagi Form Builder</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/form.css">
+</head>
+<body>
+<div class="builder" id="app">
+  <header class="tb">
+    <div class="tb-left">
+      <span class="tb-logo" aria-label="Belajarlagi Form">B</span>
+      <nav class="tb-crumb" aria-label="Form">
+        <select id="formPicker" class="tb-picker" aria-label="Pilih form"></select>
+        <span class="tb-sep">/</span>
+        <input id="formTitle" class="tb-title" aria-label="Judul form" maxlength="120">
+      </nav>
+    </div>
+    <nav class="tb-tabs" role="tablist" aria-label="Bagian">
+      <button role="tab" data-tab="content" class="active">Konten</button>
+      <button role="tab" data-tab="logic">Logika</button>
+      <button role="tab" data-tab="connect">Integrasi</button>
+      <button role="tab" data-tab="share">Bagikan</button>
+      <button role="tab" data-tab="ab">Uji A/B</button>
+      <button role="tab" data-tab="results">Hasil</button>
+    </nav>
+    <div class="tb-right">
+      <span class="tb-status" id="saveStatus" role="status"></span>
+      <span class="tb-divider" aria-hidden="true"></span>
+      <button class="tb-backend" id="openSettings" type="button" title="Tempat data disimpan"></button>
+      <button class="btn-ghost" id="preview" type="button"></button>
+      <button class="btn" id="save" type="button">Terbitkan</button>
+      <button class="tb-account" id="account" type="button" aria-label="Akun dan tim" aria-haspopup="menu" hidden></button>
+    </div>
+  </header>
+
+  <main id="panel" class="bw"></main>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="addDialog" class="modal modal-wide" aria-label="Tambah konten">
+    <div class="modal-head">
+      <h2>Tambah konten</h2>
+      <input id="addSearch" class="add-search" type="search" placeholder="Cari jenis pertanyaan" aria-label="Cari jenis pertanyaan">
+      <button class="icon-btn" type="button" id="addClose" aria-label="Tutup"></button>
+    </div>
+    <div class="add-layout">
+      <div id="addGrid" class="add-grid"></div>
+      <aside class="add-preview" id="addPreview" aria-live="polite"></aside>
+    </div>
+  </dialog>
+
+  <dialog id="settings" class="modal">
+    <form method="dialog" id="settingsForm">
+      <h2>Pengaturan backend</h2>
+      <label class="field"><span>Penyimpanan data</span>
+        <select name="backend">
+          <option value="local">Browser ini saja (demo, tanpa server)</option>
+          <option value="cloud">Cloudflare Workers + D1 (disarankan, skala besar)</option>
+          <option value="sheets">Google Sheets langsung (Apps Script)</option>
+        </select>
+      </label>
+      <label class="field" data-for="cloud"><span>URL API Worker</span>
+        <input name="apiUrl" type="text" placeholder="/api">
+        <small class="muted">Isi <code>/api</code> bila builder dibuka dari domain Worker yang sama.</small>
+      </label>
+      <label class="field" data-for="sheets"><span>URL Web App Apps Script</span>
+        <input name="sheetsUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+      </label>
+      <label class="field" data-for="sheets"><span>Admin key (ADMIN_KEY di Script Properties)</span>
+        <input name="adminKey" type="password" autocomplete="off">
+      </label>
+      <p class="muted small">Pengaturan ini hanya tersimpan di browser Anda. Jika builder di-host oleh Worker, backend Cloudflare sudah terpilih otomatis dan Anda masuk dengan akun tim.</p>
+      <div class="row end">
+        <button class="btn-ghost" value="cancel" type="submit">Batal</button>
+        <button class="btn" value="save" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="previewDialog" class="preview-dialog" aria-label="Pratinjau form">
+    <div class="preview-bar">
+      <strong>Pratinjau</strong>
+      <div class="seg" id="previewDevice">
+        <button type="button" data-device="desktop" class="active">Desktop</button>
+        <button type="button" data-device="mobile">Ponsel</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost small" type="button" id="previewRestart">Ulangi</button>
+        <button class="icon-btn" type="button" id="previewClose" aria-label="Tutup pratinjau"></button>
+      </div>
+    </div>
+    <div class="preview-stage"><div class="preview-frame" id="previewFrame"></div></div>
+  </dialog>
+
+  <dialog id="teamDialog" class="modal modal-wide team-dialog" aria-label="Tim"></dialog>
+  <dialog id="accountDialog" class="modal" aria-label="Akun Anda"></dialog>
+  <div id="auth" class="auth" hidden></div>
+
+  <dialog id="confirmDialog" class="modal confirm-dialog">
+    <form method="dialog">
+      <h2 id="confirmTitle"></h2>
+      <p class="muted" id="confirmText"></p>
+      <div class="row end">
+        <button class="btn-ghost" value="cancel" type="submit">Batal</button>
+        <button class="btn" value="ok" type="submit" id="confirmOk">Lanjut</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+  <!-- Served by the Cloudflare Worker; harmless 404 on other hosts. -->
+  <script src="belajarlagiform-config.js"></script>
+  <script type="module" src="js/builder.js"></script>
+</body>
+</html>
