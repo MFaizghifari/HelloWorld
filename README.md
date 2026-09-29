@@ -72,7 +72,8 @@ npx wrangler login
 npx wrangler d1 create belajarlagiform --location apac   # salin database_id ke wrangler.toml
 npx wrangler r2 bucket create belajarlagiform-files      # penyimpanan file upload & gambar form
 npm run db:migrate                                # buat tabel di D1
-openssl rand -base64 32 | npx wrangler secret put ADMIN_KEY   # kunci acak 32 byte: membuat akun Pemilik (dan pemulihan akun)
+openssl rand -base64 32                           # buat kunci acak 32 byte; SIMPAN di password manager
+npx wrangler secret put ADMIN_KEY                 # tempel kunci tadi: untuk membuat akun Pemilik (dan pemulihan akun)
 npm run deploy                                    # → https://form.belajarlagi.id (lihat "Domain form.belajarlagi.id")
 ```
 
@@ -163,7 +164,7 @@ Di backend Cloudflare, setiap anggota tim masuk dengan email dan kata sandinya s
 - **Undangan dan reset kata sandi memakai link sekali pakai** (undangan 7 hari, reset 24 jam). Belajarlagi Form tidak mengirim email, jadi admin menyalin link atau mengirimnya lewat tombol WhatsApp. Pemilik yang lupa kata sandi membuat link reset sendiri dengan admin key dari halaman masuk.
 - **Link ikut hak pembuatnya.** Saat link dipakai, server memeriksa ulang bahwa pembuatnya masih anggota dan masih boleh memberi peran itu (atau mengelola anggota itu). Link yang dibuat oleh atau untuk seseorang langsung batal saat perannya diubah, ia dikeluarkan, atau kepemilikan dipindahkan; link reset batal saat pemiliknya mengganti kata sandi. Semua link yang masih terbuka, termasuk link reset, terlihat di menu Tim dan bisa dibatalkan.
 - **GTM hanya untuk Admin dan Pemilik.** Container GTM bisa menjalankan skrip apa pun di domain builder, tempat sesi login tersimpan. Editor tetap bisa mengatur Pixel dan GA4 (ID-nya divalidasi ketat), tapi perubahan GTM Container ID ditolak server (HTTP 403). Untuk isolasi penuh, sajikan form responden di domain terpisah dari builder (mis. `isi.belajarlagi.id` dan `admin.belajarlagi.id`).
-- **Admin key:** buat dengan `openssl rand -base64 32` (256 bit). Tebakan admin key ikut rate limit login (10/menit per IP).
+- **Admin key:** buat dengan `openssl rand -base64 32` (256 bit), simpan di password manager, lalu tempel saat `wrangler secret put ADMIN_KEY`. Jangan di-pipe langsung: Cloudflare tidak bisa menampilkan secret lagi, padahal Anda butuh kunci ini untuk membuat akun Pemilik. Tebakan admin key ikut rate limit login (10/menit per IP).
 - **Kata sandi:** minimal 8 karakter tanpa aturan komposisi, sesuai [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html). Disimpan sebagai PBKDF2-HMAC-SHA256 100.000 iterasi dengan salt acak. OWASP menyarankan 600.000 iterasi ([Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)), tapi Workers membatasi iterasi PBKDF2 (workerd menolak dengan `iteration counts above … are not supported`, dan batas produksi yang umum dilaporkan adalah 100.000); jumlah iterasi ikut disimpan per hash sehingga bisa dinaikkan nanti (hash lama diperbarui saat login). Di workerd lokal, satu verifikasi ±43 ms CPU, jadi gunakan **Workers Paid** (batas CPU paket gratis 10 ms).
 - **Perlindungan login:** 5 kali salah → akun dikunci 15 menit (penghitung dinaikkan secara atomik di D1, jadi tebakan paralel tetap terhitung); rate limit 10 percobaan/menit per IP dan per email; pesan error dan pola query sama untuk email tak terdaftar dan kata sandi salah.
 - **Sesi:** token acak 32 byte, berlaku 30 hari, hanya hash SHA-256 yang disimpan di D1. Mengganti kata sandi atau reset mengakhiri sesi di perangkat lain; mengeluarkan anggota langsung mengakhiri semua sesinya.
