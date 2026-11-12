@@ -41,3 +41,5 @@ python3 scripts/build_data.py && python3 scripts/build_dashboard.py
 - Views Reels tidak dikembalikan oleh actor saat ini (semua 0), jadi tidak dihitung.
 - Reach, impressions, saves, shares hanya tersedia lewat API resmi (akses akun).
 - Logo BI diambil dari bi.go.id; logo Belajarlagi dari aset brand Belajarlagi.
+
+**Link publik (Vercel):** https://bi-kpw-engagement-poc.vercel.app

@@ -356,7 +356,7 @@ function renderBar(){
       <div class="r"><span>ER</span><b>${fmtPct(s.er_avg)}</b></div>`;
   })};
   const valueLabels = {id:'vl', afterDatasetsDraw(c){
-    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px 'Plus Jakarta Sans', sans-serif'; ctx.textBaseline = 'middle';
+    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = "500 12px 'Plus Jakarta Sans', sans-serif"; ctx.textBaseline = 'middle';
     c.getDatasetMeta(0).data.forEach((b,i) => ctx.fillText(mm.f(r[i][metric]), b.x + 6, b.y));
     ctx.restore();
   }};
@@ -409,7 +409,7 @@ function renderFmt(){
     return `<b>${s.k}</b><div class="r"><span>Unggahan</span><b>${s.n}</b></div><div class="r"><span>Total engagement</span><b>${fmtN(s.e)}</b></div><div class="r"><span>Per post</span><b>${fmtN(Math.round(s.ppp))}</b></div>`;
   })};
   const vl = {id:'vl2', afterDatasetsDraw(c){
-    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px 'Plus Jakarta Sans', sans-serif'; ctx.textBaseline = 'middle';
+    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = "500 12px 'Plus Jakarta Sans', sans-serif"; ctx.textBaseline = 'middle';
     c.getDatasetMeta(0).data.forEach((b,i) => ctx.fillText(fmtN(Math.round(r[i].ppp)), b.x + 6, b.y)); ctx.restore();
   }};
   charts.fmt?.destroy();
