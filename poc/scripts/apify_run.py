@@ -45,6 +45,11 @@ def main():
     with open(out, "w") as f:
         json.dump(items, f, ensure_ascii=False, indent=1)
     print(f"[{actor}] {len(items)} items -> {out}", flush=True)
+    if out.endswith("posts.json"):
+        from datetime import datetime, timezone, timedelta
+        from pathlib import Path
+        Path(__file__).resolve().parent.parent.joinpath("data/pulled_at.txt").write_text(
+            datetime.now(timezone(timedelta(hours=7))).strftime("%Y-%m-%d %H:%M WIB") + "\n")
 
 
 if __name__ == "__main__":

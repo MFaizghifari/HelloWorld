@@ -112,7 +112,8 @@ for p in posts:
     fmt[p["format"]]["engagement"] += p["engagement"]
 
 out = {
-    "generated": datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"),
+    # time the Apify pull ran (apify_run.py writes it); fall back to build time
+    "generated": (ROOT / "data/pulled_at.txt").read_text().strip() if (ROOT / "data/pulled_at.txt").exists() else datetime.now(WIB).strftime("%Y-%m-%d %H:%M WIB"),
     "period": {"start": PERIOD_START.strftime("%Y-%m-%d"), "end": PERIOD_END.strftime("%Y-%m-%d")},
     "summary": summary,
     "daily": {"days": days, **{k: [v[x] for x in days] for k, v in daily.items()}},
