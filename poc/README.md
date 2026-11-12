@@ -43,3 +43,15 @@ python3 scripts/build_data.py && python3 scripts/build_dashboard.py
 - Logo BI diambil dari bi.go.id; logo Belajarlagi dari aset brand Belajarlagi.
 
 **Link publik (Vercel):** https://bi-kpw-engagement-poc.vercel.app
+
+## Analisis topik & pencarian (AI layer, Gemini)
+
+- `scripts/taxonomy.py` berisi 12 topik yang mengikuti bidang tugas BI. Ubah di sini, hapus `data/topics.json`, lalu jalankan ulang.
+- `scripts/build_topics.py` (perlu `GEMINI_API_KEY` di env atau `poc/.env.local`):
+  - klasifikasi setiap post (topik utama, topik yang ikut dibahas, lokal/nasional, ringkasan) → `data/topics.json` (di-cache per post)
+  - ringkasan AI per KPw → `data/insights.json`
+  - embedding caption → `api/_vectors.json`, `api/_posts.json`
+- `api/search.js` (Vercel Function, env `GEMINI_API_KEY`): embedding query → 60 kandidat → Gemini menilai utama/menyinggung → jawaban singkat. Kalau API tidak terjangkau, dashboard beralih ke pencarian kata kunci.
+- Biaya: ±US$0,30 sekali proses untuk 341 post; ±US$0,01–0,02 per pencarian baru (di-cache di CDN 1 hari).
+
+Urutan build lengkap: `build_data.py` → `build_topics.py` → `build_data.py` → `build_dashboard.py`, lalu `vercel deploy --prod` dari `poc/`.

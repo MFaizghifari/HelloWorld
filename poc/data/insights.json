@@ -1,0 +1,37 @@
+{
+ "umum": [
+  "Topik ekonomi dan keuangan syariah menjadi yang paling sering diunggah dengan total 68 post, namun sistem pembayaran dan QRIS mencatatkan engagement tertinggi mencapai 22.445 engagement.",
+  "Rata-rata engagement tertinggi diraih oleh topik sistem pembayaran dan QRIS yang mencapai 510 engagement per post.",
+  "KPw Purwokerto menjadi kantor perwakilan yang paling banyak mengangkat isu lokal dengan jumlah 44 konten lokal dari total 60 post."
+ ],
+ "kpw": [
+  {
+   "username": "@bank_indonesia_jabar",
+   "narasi": "KPw Jawa Barat berfokus pada topik ekonomi dan keuangan syariah dengan total 13 post. Salah satu program khasnya adalah penyelenggaraan Lomba Desain Grafis QRIS pada rangkaian acara Bandung QRIS Art & Culinary 2026."
+  },
+  {
+   "username": "@bank_indonesia_jateng",
+   "narasi": "KPw Jawa Tengah mendominasi unggahannya pada topik ekonomi dan keuangan syariah sebanyak 12 post. Ciri khas kegiatan daerah ini ditunjukkan melalui penyaluran donasi dari acara Lari Rupiah Borobudur Playon 2026 untuk pengelolaan sampah di Magelang."
+  },
+  {
+   "username": "@bank_indonesia_purwokerto",
+   "narasi": "KPw Purwokerto memberikan porsi konten utama pada topik ekonomi dan keuangan syariah sejumlah 13 post. Kantor ini banyak mempublikasikan kegiatan kelembagaan seperti Upacara Pengukuhan Aswin Gantina sebagai Kepala Perwakilan BI Purwokerto yang baru."
+  },
+  {
+   "username": "@bank_indonesia_solo",
+   "narasi": "KPw Solo paling banyak mengunggah topik pengelolaan uang Rupiah yang mencapai 14 post. Program khasnya mencakup penyediaan layanan kas keliling penukaran uang logam Rupiah GAUL di berbagai wilayah."
+  },
+  {
+   "username": "@bank_indonesia_cirebon",
+   "narasi": "KPw Cirebon memfokuskan konten pada topik ekonomi dan keuangan syariah yang mencapai 8 post. Ciri khas program lokalnya adalah kegiatan edukasi urban farming hingga pengelolaan sampah organik oleh GenBI Ciayumajakuning untuk mendukung pengendalian inflasi."
+  },
+  {
+   "username": "@bank_indonesia_tasikmalaya",
+   "narasi": "KPw Tasikmalaya berfokus pada topik ekonomi dan keuangan syariah dengan jumlah 13 post. Kantor ini aktif menggelar acara daerah seperti festival Sawarga Tasikmalaya yang diisi pameran UMKM dan kompetisi kreatif."
+  },
+  {
+   "username": "@bank_indonesia_tegal",
+   "narasi": "KPw Tegal paling banyak mengangkat topik sistem pembayaran dan QRIS yakni sebanyak 7 post. Salah satu pencapaian khasnya adalah penerimaan penghargaan dari Kementerian Perdagangan atas pengembangan ekosistem wastra batik berkelanjutan."
+  }
+ ]
+}

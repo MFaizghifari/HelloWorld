@@ -121,8 +121,61 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
 .tt b{font-weight:700}
 .tt .r{display:flex;justify-content:space-between;gap:14px}
 
-@media (max-width:980px){.tiles{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}}
-@media (max-width:560px){.post{grid-template-columns:22px 1fr}.post .ev{grid-column:2;text-align:left}.post .ev small{display:inline;margin-left:6px}.post .cap{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.tiles{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:1.55rem}.cobrand img{height:26px}.topbar .badge{display:none}.tile .n{font-size:1.4rem}.chart{height:260px}}
+
+/* topic search + heatmap */
+.sec-title{display:flex;align-items:center;gap:10px;margin:28px 0 12px}
+.sec-title h2{font-size:1.25rem;margin:0}
+.ai-pill{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--bi);background:var(--bi-soft);border-radius:9999px;padding:3px 10px}
+.search{display:flex;gap:8px;margin:4px 0 10px}
+.search input{flex:1;min-width:0;font:inherit;font-size:1rem;padding:11px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2);color:var(--text)}
+.search input:focus{outline:2px solid var(--bi);outline-offset:1px;background:var(--surface)}
+.btn{font:inherit;font-weight:700;font-size:.92rem;border:0;border-radius:12px;padding:0 20px;background:var(--bi);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:wait}
+.sugs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.8rem;color:var(--text-2)}
+.sug{border:1px dashed var(--border);background:transparent;color:var(--text);border-radius:9999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+.sug:hover{border-style:solid;background:var(--surface-2)}
+.sr{margin-top:16px}
+.sr .answer{background:var(--bi-soft);border-radius:var(--r);padding:14px 18px;font-size:.93rem;margin-bottom:14px}
+.sr .answer .lbl{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--bi);margin-bottom:4px}
+.sr-grid{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start}
+.kbars{display:grid;gap:8px}
+.kbar{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;font-size:.84rem}
+.kbar .nm{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kbar .track{display:flex;gap:2px;height:14px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.kbar .track i{display:block;height:100%}
+.kbar .track i:first-child{border-radius:4px 0 0 4px}
+.kbar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.kbar.zero{color:var(--muted)}
+.c-main{background:var(--bi)} .c-side{background:color-mix(in srgb,var(--bi) 38%,var(--surface))}
+.post .rs{font-size:.88rem;font-weight:500}
+.post .cx{font-size:.78rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag.main{background:var(--bi);color:#fff} .tag.side{background:color-mix(in srgb,var(--bi) 22%,var(--surface));color:var(--text)}
+.more{margin-top:10px;font:inherit;font-size:.85rem;font-weight:500;background:none;border:1px solid var(--border);border-radius:9999px;padding:6px 14px;color:var(--text);cursor:pointer}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--bi);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.heat{border-collapse:separate;border-spacing:2px;font-size:.84rem}
+.heat th,.heat td{border:0;padding:8px 8px;white-space:nowrap}
+.heat th{background:none;font-size:.76rem;text-align:center;vertical-align:bottom;line-height:1.25}
+.heat th:first-child,.heat td:first-child{text-align:left}
+.heat td.c{text-align:center;border-radius:6px;cursor:pointer;font-variant-numeric:tabular-nums;min-width:58px}
+.heat td.c:hover{outline:2px solid var(--text);outline-offset:-2px}
+.heat td.c.sel{outline:2px solid var(--gold);outline-offset:-2px}
+.heat td.c.z{color:var(--muted);cursor:default}
+.heat td.tl{font-weight:500;cursor:pointer}
+.heat td.tl:hover{text-decoration:underline}
+.heat td.tot{text-align:right;font-weight:700;color:var(--text-2);font-variant-numeric:tabular-nums}
+.heat th .pd{display:block;width:8px;height:8px;border-radius:2px;margin:0 auto 4px}
+.scale{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--text-2);margin-top:8px}
+.scale span.g{display:inline-block;width:120px;height:10px;border-radius:3px;background:linear-gradient(90deg,color-mix(in srgb,var(--bi) 8%,var(--surface)),var(--bi))}
+.ctrls{display:flex;gap:8px;flex-wrap:wrap}
+.aig{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.aic{border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:.88rem}
+.aic h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
+.aic h3 i{width:10px;height:10px;border-radius:3px}
+.aic p{margin:0 0 8px;color:var(--text-2)}
+
+@media (max-width:980px){.sr-grid{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}}
+@media (max-width:560px){.search{flex-direction:column}.btn{padding:11px}.kbar{grid-template-columns:84px 1fr 36px}.post{grid-template-columns:22px 1fr}.post .ev{grid-column:2;text-align:left}.post .ev small{display:inline;margin-left:6px}.post .cap{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.tiles{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:1.55rem}.cobrand img{height:26px}.topbar .badge{display:none}.tile .n{font-size:1.4rem}.chart{height:260px}}
 </style>
 </head>
 <body>
@@ -160,6 +213,55 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
     <div class="tiles" id="tiles"></div>
 
     <div class="insight" id="insight"></div>
+
+    <div class="sec-title"><h2>Topik konten</h2><span class="ai-pill">✦ AI · Gemini</span></div>
+
+    <section class="card" style="margin-bottom:16px">
+      <h2>Cari unggahan berdasarkan topik</h2>
+      <div class="sub">Ketik topik atau isu. AI mencari berdasarkan makna, bukan hanya kata yang sama, lalu menilai apakah unggahan membahasnya sebagai topik utama atau hanya menyinggung.</div>
+      <form class="search" id="srForm" role="search">
+        <input id="srQ" type="search" placeholder="mis. stabilitas nilai tukar" aria-label="Topik yang dicari" autocomplete="off">
+        <button class="btn" id="srBtn" type="submit">Cari</button>
+      </form>
+      <div class="sugs"><span>Contoh:</span>
+        <button class="sug" type="button">stabilitas nilai tukar</button>
+        <button class="sug" type="button">penipuan digital</button>
+        <button class="sug" type="button">harga pangan dan inflasi</button>
+        <button class="sug" type="button">QRIS untuk UMKM</button>
+        <button class="sug" type="button">GenBI dan mahasiswa</button>
+        <button class="sug" type="button">ciri keaslian uang Rupiah</button>
+      </div>
+      <div class="sr" id="srOut"></div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <div>
+          <h2 id="heatTitle">Peta topik per KPw</h2>
+          <div class="sub" id="heatSub">Jumlah unggahan per topik. Klik sel untuk melihat unggahannya.</div>
+        </div>
+        <div class="ctrls">
+          <div class="seg" role="group" aria-label="Nilai peta" id="heatMode">
+            <button data-v="n" aria-pressed="true">Jumlah post</button>
+            <button data-v="epp" aria-pressed="false">Eng/post</button>
+          </div>
+          <div class="seg" role="group" aria-label="Cakupan topik" id="heatScope">
+            <button data-v="utama" aria-pressed="true">Topik utama</button>
+            <button data-v="semua" aria-pressed="false">+ dibahas</button>
+          </div>
+        </div>
+      </div>
+      <div class="tscroll"><table class="heat" id="heat"></table></div>
+      <div class="scale" id="heatScale"></div>
+      <div id="heatPosts" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <h2>Ringkasan AI per KPw</h2>
+      <div class="sub">Ditulis Gemini dari klasifikasi topik seluruh unggahan. Angka topik dihitung langsung dari data.</div>
+      <div class="insight" id="aiUmum" style="margin:8px 0 12px"></div>
+      <div class="aig" id="aiKpw"></div>
+    </section>
 
     <div class="grid2">
       <section class="card">
@@ -220,6 +322,7 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
             <li><b>Per post</b> = total engagement ÷ jumlah unggahan.</li>
             <li><b>ER (engagement rate)</b> = rata-rata (engagement ÷ follower) per unggahan.</li>
             <li>Unggahan kolaborasi yang tampil di grid akun KPw dihitung untuk KPw tersebut.</li>
+            <li><b>Topik</b>: setiap unggahan diklasifikasi Gemini ke 1 topik utama + maks. 2 topik yang ikut dibahas, dari 12 topik yang mengikuti bidang tugas BI. <b>Lokal</b> = kegiatan/isu di wilayah KPw, <b>nasional</b> = materi BI Pusat yang dibagikan ulang.</li>
           </ul>
         </div>
         <div>
@@ -271,7 +374,8 @@ document.getElementById('gen').textContent = 'Data ditarik ' + DATA.generated;
 document.getElementById('srcList').innerHTML = [
   'Data: Apify <code>apify/instagram-scraper</code>, akun dari daftar resmi KPw (proyek KPw Program Radar).',
   'Biaya penarikan PoC: <b>US$0,80</b> untuk ' + fmtN(DATA.posts.length) + ' unggahan + profil (±US$2,3 per 1.000 unggahan).',
-  'Proyeksi 46 KPw × 12 bulan, Instagram saja: ±27 ribu unggahan ≈ <b>US$62</b>.'
+  'Proyeksi 46 KPw × 12 bulan, Instagram saja: ±27 ribu unggahan ≈ <b>US$62</b>.',
+  'Analisis topik (Gemini 3.6 Flash + Gemini Embedding): ±<b>US$0,30</b> sekali proses untuk ' + fmtN(DATA.posts.length) + ' unggahan. Tiap pencarian baru ±US$0,01–0,02, hasil yang sama disimpan di cache.'
 ].map(s => '<li>' + s + '</li>').join('');
 
 function rows(){ return DATA.summary.filter(s => prov === 'all' || s.provinsi === prov); }
@@ -444,20 +548,20 @@ function renderPosts(){
   document.getElementById('topPosts').innerHTML = ps.map((p,i) => `<a class="post" href="${p.url}" target="_blank" rel="noopener">
     <span class="rk">${i+1}</span>
     <span style="min-width:0"><div class="cap">${esc(p.caption || '(tanpa caption)')}</div>
-      <div class="pm"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${provColor(p.provinsi)}"></i>KPw ${p.kpw} · ${fmtD(p.date)} <span class="tag">${p.format}</span>${p.collab ? '<span class="tag">Kolaborasi</span>' : ''}</div></span>
+      <div class="pm"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${provColor(p.provinsi)}"></i>KPw ${p.kpw} · ${fmtD(p.date)} <span class="tag">${p.format}</span>${p.topik ? `<span class="tag">${TL[p.topik]}</span>` : ''}${p.collab ? '<span class="tag">Kolaborasi</span>' : ''}</div></span>
     <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar</small></span></a>`).join('');
 }
 
-function renderAll(){ renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); }
+function renderAll(){ renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); renderHeat(); renderAI(); if (lastSearch) renderSearch(); }
 
-document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('.filters .chip').forEach(b => b.addEventListener('click', () => {
   prov = b.dataset.prov;
-  document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+  document.querySelectorAll('.filters .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
   renderAll();
 }));
-document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('.seg button[data-m]').forEach(b => b.addEventListener('click', () => {
   metric = b.dataset.m;
-  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  document.querySelectorAll('.seg button[data-m]').forEach(x => x.setAttribute('aria-pressed', x === b));
   renderBar();
 }));
 document.querySelectorAll('#tbl th[data-k]').forEach(th => th.addEventListener('click', () => {
@@ -465,6 +569,143 @@ document.querySelectorAll('#tbl th[data-k]').forEach(th => th.addEventListener('
   if (sortK === k) sortDir *= -1; else { sortK = k; sortDir = k === 'kpw' ? 1 : -1; }
   renderTable();
 }));
+
+/* ---------- Topik ---------- */
+const TL = Object.fromEntries(DATA.topics.map(t => [t.id, t.label]));
+const BYID = Object.fromEntries(DATA.posts.map(p => [p.id, p]));
+let heatMode = 'n', heatScope = 'utama', heatSel = null, lastSearch = null, srShowAll = false;
+const hasT = (p, t) => p.topik === t || (heatScope === 'semua' && p.topik_lain.includes(t));
+const shade = f => `color-mix(in srgb, var(--bi) ${Math.round(8 + f * 82)}%, var(--surface))`;
+
+function postRow(p, i, extra = ''){
+  return `<a class="post" href="${p.url}" target="_blank" rel="noopener">
+    <span class="rk">${i+1}</span>
+    <span style="min-width:0"><div class="rs">${esc(p.ringkasan || p.caption || '')}</div>
+      <div class="cx">${esc(p.caption || '')}</div>
+      <div class="pm"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${provColor(p.provinsi)}"></i>KPw ${p.kpw} · ${fmtD(p.date)} ${extra}<span class="tag">${TL[p.topik] || ''}</span><span class="tag">${p.cakupan === 'nasional' ? 'Materi nasional' : 'Konten lokal'}</span></div></span>
+    <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar</small></span></a>`;
+}
+
+function renderHeat(){
+  const ks = rows(), ps = postsF();
+  const cell = (t, k) => { const xs = ps.filter(p => p.username === k.username && hasT(p, t)); const e = xs.reduce((a,p) => a + p.engagement, 0); return {n: xs.length, e, epp: xs.length ? e / xs.length : 0}; };
+  const tops = DATA.topics.map(t => {
+    const cs = ks.map(k => cell(t.id, k)); const n = cs.reduce((a,c) => a + c.n, 0), e = cs.reduce((a,c) => a + c.e, 0);
+    return {t, cs, n, e, epp: n ? e / n : 0};
+  }).sort((a,b) => heatMode === 'n' ? b.n - a.n : b.epp - a.epp);
+  const val = c => heatMode === 'n' ? c.n : c.epp;
+  // eng/post on 1-post cells is noisy: scale to the 95th percentile so one viral post doesn't wash out the rest
+  const vals = tops.flatMap(r => r.cs.map(val)).filter(v => v > 0).sort((a,b) => a - b);
+  const max = vals.length ? vals[Math.min(vals.length - 1, Math.floor(vals.length * (heatMode === 'n' ? 1 : .95)))] || 1 : 1;
+  document.getElementById('heatSub').textContent = (heatMode === 'n' ? 'Jumlah unggahan' : 'Rata-rata likes + komentar per unggahan') + (heatScope === 'utama' ? ' menurut topik utama.' : ' menurut topik utama dan topik yang ikut dibahas (satu unggahan bisa terhitung di beberapa topik).') + ' Klik sel untuk melihat unggahannya.';
+  const fv = v => heatMode === 'n' ? v : fmtN(Math.round(v));
+  document.getElementById('heat').innerHTML = `<thead><tr><th>Topik</th>${ks.map(k => `<th><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">${heatMode === 'n' ? 'Total' : 'Semua'}</th></tr></thead><tbody>` +
+    tops.map(r => `<tr><td class="tl" data-t="${r.t.id}" title="${esc(r.t.desc)}">${r.t.label}</td>${r.cs.map((c, i) => {
+      const v = val(c), f = Math.min(1, v / max), sel = heatSel && heatSel.t === r.t.id && heatSel.u === ks[i].username;
+      return c.n ? `<td class="c${sel ? ' sel' : ''}" data-t="${r.t.id}" data-u="${ks[i].username}" data-i="${i}" style="background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}">${fv(v)}</td>` : `<td class="c z">·</td>`;
+    }).join('')}<td class="tot">${fv(heatMode === 'n' ? r.n : r.epp)}</td></tr>`).join('') + '</tbody>';
+  document.getElementById('heatScale').innerHTML = `<span>0</span><span class="g"></span><span>${fv(max)}${heatMode === 'epp' ? '+' : ''}</span><span style="margin-left:8px">${heatMode === 'epp' ? 'Sel dengan 1–2 unggahan bisa sangat dipengaruhi satu post viral.' : ''}</span>`;
+  const tt = tooltipEl();
+  document.querySelectorAll('#heat td.c[data-t]').forEach(td => {
+    td.addEventListener('mousemove', ev => {
+      const k = ks[+td.dataset.i], c = cell(td.dataset.t, k);
+      tt.innerHTML = `<b>${TL[td.dataset.t]}</b><div style="color:var(--muted)">KPw ${k.kpw_full}</div><div class="r"><span>Unggahan</span><b>${c.n}</b></div><div class="r"><span>Engagement</span><b>${fmtN(c.e)}</b></div><div class="r"><span>Per post</span><b>${fmtN(Math.round(c.epp))}</b></div><div class="r"><span>Porsi dari post KPw</span><b>${Math.round(c.n / (k.posts || 1) * 100)}%</b></div>`;
+      tt.style.display = 'block';
+      let x = ev.clientX + 14; if (x + tt.offsetWidth > innerWidth - 8) x = ev.clientX - tt.offsetWidth - 14;
+      tt.style.left = x + 'px'; tt.style.top = Math.max(8, ev.clientY - 10) + 'px';
+    });
+    td.addEventListener('mouseleave', () => { tt.style.display = 'none'; });
+    td.addEventListener('click', () => { heatSel = {t: td.dataset.t, u: td.dataset.u}; renderHeat(); });
+  });
+  document.querySelectorAll('#heat td.tl').forEach(td => td.addEventListener('click', () => { heatSel = {t: td.dataset.t, u: null}; renderHeat(); }));
+  const box = document.getElementById('heatPosts');
+  if (!heatSel){ box.innerHTML = ''; return; }
+  const xs = ps.filter(p => hasT(p, heatSel.t) && (!heatSel.u || p.username === heatSel.u)).sort((a,b) => b.engagement - a.engagement);
+  const k = heatSel.u && DATA.summary.find(s => s.username === heatSel.u);
+  box.innerHTML = `<div class="card-head" style="margin-bottom:8px"><div><b>${TL[heatSel.t]}</b> · ${k ? 'KPw ' + k.kpw : 'semua KPw'} · ${xs.length} unggahan</div><button class="more" id="heatClose" style="margin:0">Tutup</button></div><div class="posts">${xs.slice(0, 15).map((p,i) => postRow(p,i)).join('')}</div>${xs.length > 15 ? `<div class="sub" style="margin-top:8px">Menampilkan 15 dari ${xs.length}, urut engagement tertinggi.</div>` : ''}`;
+  document.getElementById('heatClose').onclick = () => { heatSel = null; renderHeat(); };
+}
+
+function renderAI(){
+  const I = DATA.insights; if (!I) return;
+  document.getElementById('aiUmum').innerHTML = '<b>Temuan lintas KPw</b><ul>' + I.umum.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>';
+  const nar = Object.fromEntries(I.kpw.map(x => [x.username.replace(/^@/, ''), x.narasi]));
+  document.getElementById('aiKpw').innerHTML = rows().map(k => {
+    const ps = DATA.posts.filter(p => p.username === k.username);
+    const c = {}; ps.forEach(p => c[p.topik] = (c[p.topik] || 0) + 1);
+    const top = Object.entries(c).sort((a,b) => b[1] - a[1]).slice(0, 3);
+    const lok = ps.filter(p => p.cakupan === 'lokal').length;
+    return `<div class="aic"><h3><i style="background:${provColor(k.provinsi)}"></i>KPw ${k.kpw}</h3><p>${esc(nar[k.username] || '')}</p>
+      <div>${top.map(([t,n]) => `<span class="tag" style="margin:0 4px 4px 0">${TL[t]} · ${n}</span>`).join('')}<span class="tag" style="margin:0 4px 4px 0">Konten lokal ${Math.round(lok / (ps.length || 1) * 100)}%</span></div></div>`;
+  }).join('');
+}
+
+function localSearch(q){
+  const toks = q.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !['dan','yang','untuk','dengan','di','ke'].includes(w));
+  const results = DATA.posts.map(p => {
+    const hay = (p.caption_full + ' ' + p.ringkasan + ' ' + p.kata_kunci.join(' ')).toLowerCase();
+    const hit = toks.filter(w => hay.includes(w)).length;
+    return {id: p.id, s: hit / (toks.length || 1), rel: hit === toks.length ? 'utama' : 'menyinggung'};
+  }).filter(r => r.s >= .5).sort((a,b) => b.s - a.s);
+  return {q, ai: false, offline: true, jawaban: null, results};
+}
+
+async function doSearch(q){
+  q = q.trim(); if (q.length < 2) return;
+  const out = document.getElementById('srOut'), btn = document.getElementById('srBtn');
+  document.getElementById('srQ').value = q;
+  btn.disabled = true; srShowAll = false;
+  out.innerHTML = `<div class="sub"><span class="spin"></span>Mencari unggahan tentang “${esc(q)}” dan meminta AI menilai relevansinya…</div>`;
+  try {
+    const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    lastSearch = await r.json();
+  } catch (e) {
+    console.warn('search fallback', e);
+    lastSearch = localSearch(q);
+  }
+  btn.disabled = false;
+  try { history.replaceState(null, '', '?q=' + encodeURIComponent(q)); } catch (e) {}
+  renderSearch();
+}
+
+function renderSearch(){
+  const S = lastSearch, out = document.getElementById('srOut');
+  const ks = rows();
+  const res = S.results.map(r => ({...r, p: BYID[r.id]})).filter(r => r.p && (prov === 'all' || r.p.provinsi === prov));
+  res.sort((a,b) => (a.rel === 'utama' ? 0 : 1) - (b.rel === 'utama' ? 0 : 1) || b.s - a.s);
+  const cnt = ks.map(k => ({k, m: res.filter(r => r.p.username === k.username && r.rel === 'utama').length, s: res.filter(r => r.p.username === k.username && r.rel !== 'utama').length}))
+    .sort((a,b) => (b.m + b.s) - (a.m + a.s) || b.m - a.m);
+  const max = Math.max(1, ...cnt.map(c => c.m + c.s));
+  const nm = res.filter(r => r.rel === 'utama').length, ns = res.length - nm;
+  const none = cnt.filter(c => !c.m && !c.s).map(c => c.k.kpw);
+  const head = S.offline
+    ? `<div class="answer"><div class="lbl">Mode kata kunci</div>Layanan AI tidak terjangkau dari halaman ini, jadi hasil di bawah memakai pencocokan kata pada caption.</div>`
+    : (S.jawaban ? `<div class="answer"><div class="lbl">✦ Jawaban AI · Gemini</div><b>${nm} unggahan</b> membahas “${esc(S.q)}” sebagai topik utama dan <b>${ns}</b> menyinggungnya${prov !== 'all' ? ' (Provinsi ' + prov + ')' : ''}${none.length ? `; tidak ditemukan di KPw ${none.join(', ')}` : ''}. ${esc(S.jawaban)}</div>` : '');
+  const shown = srShowAll ? res : res.slice(0, 12);
+  out.innerHTML = head + (res.length ? `<div class="sr-grid">
+    <div>
+      <div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Unggahan per KPw</div>
+      <div class="kbars">${cnt.map(c => `<div class="kbar${c.m + c.s ? '' : ' zero'}"><span class="nm">${c.k.kpw}</span><span class="track">${c.m ? `<i class="c-main" style="width:${c.m / max * 100}%"></i>` : ''}${c.s ? `<i class="c-side" style="width:${c.s / max * 100}%"></i>` : ''}</span><span class="v">${c.m + c.s}</span></div>`).join('')}</div>
+      <div class="legend" style="margin-top:10px"><span><i class="c-main"></i>${S.offline ? 'Semua kata cocok' : 'Topik utama'}</span><span><i class="c-side"></i>${S.offline ? 'Sebagian cocok' : 'Menyinggung'}</span></div>
+    </div>
+    <div>
+      <div class="posts">${shown.map((r,i) => postRow(r.p, i, `<span class="tag ${r.rel === 'utama' ? 'main' : 'side'}">${S.offline ? (r.rel === 'utama' ? 'Cocok' : 'Sebagian') : (r.rel === 'utama' ? 'Utama' : 'Menyinggung')}</span>`)).join('')}</div>
+      ${res.length > 12 ? `<button class="more" id="srMore">${srShowAll ? 'Tampilkan lebih sedikit' : 'Tampilkan semua ' + res.length + ' unggahan'}</button>` : ''}
+    </div></div>` : `<div class="sub">Tidak ada unggahan yang membahas topik ini dalam periode data.</div>`);
+  const m = document.getElementById('srMore'); if (m) m.onclick = () => { srShowAll = !srShowAll; renderSearch(); };
+}
+
+document.getElementById('srForm').addEventListener('submit', e => { e.preventDefault(); doSearch(document.getElementById('srQ').value); });
+document.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => doSearch(b.textContent)));
+document.querySelectorAll('#heatMode button').forEach(b => b.addEventListener('click', () => {
+  heatMode = b.dataset.v; document.querySelectorAll('#heatMode button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderHeat();
+}));
+document.querySelectorAll('#heatScope button').forEach(b => b.addEventListener('click', () => {
+  heatScope = b.dataset.v; document.querySelectorAll('#heatScope button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderHeat();
+}));
+{ const q0 = new URLSearchParams(location.search).get('q'); if (q0) doSearch(q0); }
+
 document.addEventListener('scroll', () => { tooltipEl().style.display = 'none'; }, {passive:true});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
 new MutationObserver(renderAll).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});

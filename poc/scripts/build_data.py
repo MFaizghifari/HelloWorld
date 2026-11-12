@@ -8,6 +8,7 @@ Posts are attributed to the KPw profile they were scraped from (inputUrl), so
 collab posts that appear on a KPw's grid count for that KPw.
 """
 import json
+import sys
 import collections
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -20,6 +21,12 @@ accounts = json.loads((ROOT / "data/accounts.json").read_text())
 SHORT = {"Provinsi Jawa Barat": "Prov. Jabar", "Provinsi Jawa Tengah": "Prov. Jateng"}
 for a in accounts:
     a["kpw_pendek"] = SHORT.get(a["kpw"], a["kpw_pendek"])
+sys.path.insert(0, str(ROOT / "scripts"))
+from taxonomy import TOPICS  # noqa: E402
+tpath = ROOT / "data/topics.json"
+TOPIC_DATA = json.loads(tpath.read_text()) if tpath.exists() else {}
+ipath = ROOT / "data/insights.json"
+INSIGHTS = json.loads(ipath.read_text()) if ipath.exists() else None
 posts_raw = json.loads((ROOT / "raw/posts.json").read_text())
 details = {d["username"]: d for d in json.loads((ROOT / "raw/details.json").read_text())}
 by_url = {a["url"].rstrip("/").lower(): a for a in accounts}
@@ -44,8 +51,16 @@ for p in posts_raw:
     comments = max(p.get("commentsCount") or 0, 0)
     followers = details[acc["username"]]["followersCount"]
     eng = likes + comments
-    caption = (p.get("caption") or "").strip().replace("\n", " ")
+    caption = " ".join((p.get("caption") or "").split())
+    t = TOPIC_DATA.get(p["shortCode"], {})
     posts.append({
+        "id": p["shortCode"],
+        "topik": t.get("topik_utama"),
+        "topik_lain": t.get("topik_lain", []),
+        "cakupan": t.get("cakupan"),
+        "ringkasan": t.get("ringkasan", ""),
+        "kata_kunci": t.get("kata_kunci", []),
+        "caption_full": caption[:600],
         "kpw": acc["kpw_pendek"],
         "provinsi": acc["provinsi"],
         "username": acc["username"],
@@ -103,6 +118,8 @@ out = {
     "daily": {"days": days, **{k: [v[x] for x in days] for k, v in daily.items()}},
     "formats": [{"format": k, **v, "eng_per_post": round(v["engagement"] / v["posts"], 1)} for k, v in fmt.items()],
     "posts": sorted(posts, key=lambda p: -p["engagement"]),
+    "topics": [{"id": t["id"], "label": t["label"], "desc": t["desc"]} for t in TOPICS],
+    "insights": INSIGHTS,
 }
 (ROOT / "data/dashboard.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
 print(f"{len(posts)} posts, {sum(s['engagement'] for s in summary):,} engagement")
