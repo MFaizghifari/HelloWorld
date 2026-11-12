@@ -215,8 +215,26 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
 .tt b{font-weight:600}
 .tt .r{display:flex;justify-content:space-between;gap:14px}
 
-@media (max-width:1020px){.appnav{display:none}.kpis{grid-template-columns:repeat(3,1fr)}.tile:nth-child(4){border-left:0}.tile:nth-child(n+4){border-top:1px solid var(--line)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}.sr-grid{grid-template-columns:1fr}.insight ul{grid-template-columns:1fr}}
+
+.flow{list-style:none;margin:0 0 22px;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+.flow li{padding:14px 16px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:3px;font-size:.82rem;color:var(--ink-2);background:var(--surface-2)}
+.flow li:first-child{border-left:0}
+.flow .st{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.flow b{font-family:var(--display);font-weight:600;font-size:.92rem;color:var(--ink)}
+.accts{list-style:none;padding:0!important;margin:6px 0 0;display:grid;gap:3px}.accts li{display:flex;justify-content:space-between;gap:10px;margin:0;font-size:.8rem}.accts li span:first-child{white-space:nowrap;flex:none}.accts li span:last-child{min-width:0;color:var(--ink-3);font-family:var(--mono);font-size:.74rem;overflow:hidden;text-overflow:ellipsis}
+.mgrid{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:32px}
+.defs{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+.defs dt{font-weight:600;color:var(--ink);white-space:nowrap}
+.defs dd{margin:0}
+.topics{margin-top:12px;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 14px}
+.topics summary{cursor:pointer;font-weight:600;color:var(--ink);font-size:.84rem}
+.topics[open] summary{margin-bottom:10px}
+.topics .defs dt{white-space:normal;max-width:150px}
+select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:5px 28px 5px 10px;appearance:none;-webkit-appearance:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+
+@media (max-width:1020px){.flow{grid-template-columns:1fr 1fr}.flow li:nth-child(3){border-left:0}.flow li:nth-child(n+3){border-top:1px solid var(--line)}.mgrid{grid-template-columns:1fr}.appnav{display:none}.kpis{grid-template-columns:repeat(3,1fr)}.tile:nth-child(4){border-left:0}.tile:nth-child(n+4){border-top:1px solid var(--line)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}.sr-grid{grid-template-columns:1fr}.insight ul{grid-template-columns:1fr}}
 @media (max-width:600px){
+  .flow{grid-template-columns:1fr}.flow li{border-left:0!important}.flow li+li{border-top:1px solid var(--line)}
   .wrap{padding:0 16px}.appbar .wrap{gap:10px}.poc{display:none}.cobrand img{height:22px}
   .phead{padding-top:24px}.phead h1{font-size:1.5rem}
   .filters{width:100%;overflow-x:auto}.chip{flex:1;padding:7px 8px}
@@ -356,8 +374,13 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
         </tr></thead><tbody></tbody></table></div>
       </section>
       <section class="card">
-        <h2>Engagement per format konten</h2>
-        <div class="sub">Rata-rata likes + komentar per unggahan</div>
+        <div class="card-head">
+          <div>
+            <h2>Engagement per format konten</h2>
+            <div class="sub" id="fmtSub">Rata-rata likes + komentar per unggahan</div>
+          </div>
+          <select class="kpw" id="fmtKpw" aria-label="Pilih KPw untuk grafik format"></select>
+        </div>
         <div class="chart" style="height:220px"><canvas id="fmtChart" aria-label="Grafik batang engagement per format"></canvas></div>
         <div class="sub" id="fmtNote" style="margin-top:8px"></div>
       </section>
@@ -370,29 +393,41 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
 
     <div class="sec" id="metodologi"><h2>Metodologi</h2></div>
     <section class="card notes">
-      <div class="cols3">
+      <ol class="flow" aria-label="Alur pengolahan data">
+        <li><span class="st">Langkah 1</span><b>Penarikan data</b><span id="mFlow1"></span></li>
+        <li><span class="st">Langkah 2</span><b>Pembersihan &amp; atribusi</b><span>Unggahan di luar periode dan duplikat dibuang. Setiap unggahan dicatat untuk akun KPw tempat unggahan itu tampil.</span></li>
+        <li><span class="st">Langkah 3</span><b>Klasifikasi topik (AI)</b><span>Gemini membaca caption tiap unggahan dan memberi 1 topik utama, maks. 2 topik pendamping, cakupan lokal/nasional, dan ringkasan.</span></li>
+        <li><span class="st">Langkah 4</span><b>Agregasi</b><span>Semua angka di dashboard dihitung langsung dari data per unggahan. AI hanya menulis narasi, tidak menghitung.</span></li>
+      </ol>
+      <div class="mgrid">
         <div>
-          <h3>Definisi</h3>
-          <ul>
-            <li><b>Engagement</b> = likes + komentar per unggahan.</li>
-            <li><b>Per post</b> = total engagement ÷ jumlah unggahan.</li>
-            <li><b>ER (engagement rate)</b> = rata-rata (engagement ÷ follower) per unggahan.</li>
-            <li>Unggahan kolaborasi yang tampil di grid akun KPw dihitung untuk KPw tersebut.</li>
-            <li><b>Topik</b>: setiap unggahan diklasifikasi Gemini ke 1 topik utama + maks. 2 topik yang ikut dibahas, dari 12 topik yang mengikuti bidang tugas BI. <b>Lokal</b> = kegiatan/isu di wilayah KPw, <b>nasional</b> = materi BI Pusat yang dibagikan ulang.</li>
-          </ul>
+          <h3>Cakupan data</h3>
+          <ul id="mScope"></ul>
+          <h3 style="margin-top:18px">Definisi metrik</h3>
+          <dl class="defs">
+            <dt>Engagement</dt><dd>Likes + komentar per unggahan.</dd>
+            <dt>Per post</dt><dd>Total engagement ÷ jumlah unggahan.</dd>
+            <dt>ER</dt><dd>Engagement rate: rata-rata (engagement ÷ follower akun) per unggahan. Membandingkan akun dengan jumlah follower berbeda secara adil.</dd>
+            <dt>Format</dt><dd>Reels (video), Carousel (beberapa slide), dan Foto (satu gambar), sesuai jenis unggahan di Instagram.</dd>
+            <dt>Kolaborasi</dt><dd>Unggahan kolaborasi yang tampil di grid akun KPw dihitung untuk KPw tersebut.</dd>
+          </dl>
         </div>
         <div>
-          <h3>Sumber &amp; biaya PoC</h3>
-          <ul id="srcList"></ul>
+          <h3>Analisis topik &amp; pencarian</h3>
+          <ul>
+            <li><b>Topik utama</b> adalah inti pesan unggahan. <b>Topik pendamping</b> hanya diberikan bila dibahas secara substantif, bukan sekadar disebut di hashtag atau kalimat penutup.</li>
+            <li><b>Konten lokal</b> = kegiatan atau isu di wilayah KPw. <b>Materi nasional</b> = konten BI Pusat yang dibagikan ulang, misalnya hasil RDG atau kampanye nasional.</li>
+            <li><b>Pencarian</b> bekerja dua tahap: unggahan diurutkan menurut kemiripan makna dengan kata yang dicari (embedding), lalu 60 kandidat teratas dinilai AI sebagai <i>topik utama</i>, <i>menyinggung</i>, atau tidak relevan.</li>
+            <li>Karena tujuannya berbeda, "utama" di hasil pencarian bisa lebih banyak daripada di peta topik. Peta topik memberi tepat satu topik utama per unggahan, sedangkan pencarian menilai apakah topik yang dicari menjadi inti unggahan, walaupun unggahan itu juga membahas hal lain.</li>
+          </ul>
+          <details class="topics">
+            <summary>Lihat 12 topik dan definisinya</summary>
+            <dl class="defs" id="mTopics"></dl>
+          </details>
         </div>
         <div>
-          <h3>Batasan data</h3>
-          <ul>
-            <li>Hanya metrik publik. Reach, impressions, saves, dan shares tidak tersedia lewat scraping.</li>
-            <li>Jumlah views Reels tidak dikembalikan oleh scraper saat ini, sehingga belum dihitung.</li>
-            <li>Follower adalah angka saat data ditarik, bukan per tanggal unggah.</li>
-            <li>PoC ini hanya Instagram. TikTok, Facebook, YouTube, dan X bisa ditambahkan pada versi penuh.</li>
-          </ul>
+          <h3>Batasan &amp; cara membaca</h3>
+          <ul id="mLimits"></ul>
         </div>
       </div>
     </section>
@@ -427,12 +462,27 @@ document.getElementById('heroMeta').innerHTML = [
 ].map(s => '<span>' + s + '</span>').join('');
 document.getElementById('gen').textContent = 'Data ditarik ' + DATA.generated;
 document.getElementById('heroMeta').insertAdjacentHTML('beforeend', '<span>Data per ' + DATA.generated.replace(/^(\d{4})-(\d{2})-(\d{2})/, (m,y,mo,d) => +d + ' ' + MONTHS[+mo-1] + ' ' + y) + '</span>');
-document.getElementById('srcList').innerHTML = [
-  'Data: Apify <code>apify/instagram-scraper</code>, akun dari daftar resmi KPw (proyek KPw Program Radar).',
-  'Biaya penarikan PoC: <b>US$0,80</b> untuk ' + fmtN(DATA.posts.length) + ' unggahan + profil (±US$2,3 per 1.000 unggahan).',
-  'Proyeksi 46 KPw × 12 bulan, Instagram saja: ±27 ribu unggahan ≈ <b>US$62</b>.',
-  'Analisis topik (Gemini 3.6 Flash + Gemini Embedding): ±<b>US$0,30</b> sekali proses untuk ' + fmtN(DATA.posts.length) + ' unggahan. Tiap pencarian baru ±US$0,01–0,02, hasil yang sama disimpan di cache.'
-].map(s => '<li>' + s + '</li>').join('');
+(() => {
+  const li = xs => xs.map(x => '<li>' + x + '</li>').join('');
+  const period = fmtD(DATA.period.start) + ' – ' + fmtD(DATA.period.end) + ' 2026';
+  document.getElementById('mFlow1').textContent = 'Unggahan publik dan profil 7 akun Instagram resmi KPw ditarik otomatis dengan scraper data publik pada ' + DATA.generated.replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/, (m,y,mo,d,h,mi) => +d + ' ' + MONTHS[+mo-1] + ' ' + y + ' pukul ' + h + '.' + mi) + '.';
+  document.getElementById('mScope').innerHTML = li([
+    '<b>Platform:</b> Instagram (feed, carousel, dan Reels).',
+    '<b>Periode:</b> ' + period + ', menurut tanggal unggah (WIB).',
+    '<b>Akun (' + DATA.summary.length + '):</b><ul class="accts">' + DATA.summary.map(s => '<li><span>KPw ' + s.kpw + '</span><span>@' + s.username + '</span></li>').join('') + '</ul>',
+    '<b>Volume:</b> ' + fmtN(DATA.posts.length) + ' unggahan.',
+  ]);
+  document.getElementById('mTopics').innerHTML = DATA.topics.map(t => `<dt>${t.label}</dt><dd>${esc(t.desc)}</dd>`).join('');
+  const top = DATA.posts[0], topK = DATA.summary.find(s => s.username === top.username);
+  document.getElementById('mLimits').innerHTML = li([
+    'Hanya metrik publik. Reach, impressions, saves, dan shares hanya tersedia lewat akses resmi akun (Meta Graph API).',
+    'Jumlah views Reels belum tersedia dari sumber data publik, sehingga belum dihitung dalam engagement.',
+    'Follower adalah angka saat data ditarik, bukan per tanggal unggah.',
+    `Satu unggahan viral bisa menggeser total. Unggahan teratas (KPw ${top.kpw}, ${fmtD(top.date)}) meraih ${fmtN(top.engagement)} engagement, ${Math.round(top.engagement / topK.engagement * 100)}% dari total akun itu. Bandingkan juga <b>Per post</b> dan <b>ER</b>.`,
+    'Rata-rata dari 1–2 unggahan (misalnya sel kecil di peta topik) mudah dipengaruhi satu unggahan, jadi baca bersama jumlah unggahannya.',
+    'Klasifikasi AI bisa keliru pada unggahan dengan caption sangat pendek atau ambigu. Setiap angka bisa ditelusuri ke unggahan aslinya lewat tautan Instagram.',
+  ]);
+})();
 
 function rows(){ return DATA.summary.filter(s => prov === 'all' || s.provinsi === prov); }
 function postsF(){ return DATA.posts.filter(p => prov === 'all' || p.provinsi === prov); }
@@ -558,8 +608,15 @@ function renderLine(){
   document.getElementById('lineLegend').innerHTML = show.map(p => `<span><i style="background:${provColor(p)}"></i>Provinsi ${p} (${DATA.summary.filter(s => s.provinsi === p).length} KPw): ${fmtN(DATA.daily[p].reduce((a,b) => a+b, 0))}</span>`).join('');
 }
 
+let fmtKpw = 'all';
 function renderFmt(){
-  const ps = postsF(); const fm = {};
+  const sel = document.getElementById('fmtKpw'), ks = rows();
+  if (fmtKpw !== 'all' && !ks.some(k => k.username === fmtKpw)) fmtKpw = 'all';
+  sel.innerHTML = `<option value="all">${prov === 'all' ? 'Semua KPw' : 'Semua KPw ' + prov}</option>` + ks.map(k => `<option value="${k.username}">KPw ${k.kpw}</option>`).join('');
+  sel.value = fmtKpw;
+  const kk = ks.find(k => k.username === fmtKpw);
+  document.getElementById('fmtSub').textContent = 'Rata-rata likes + komentar per unggahan' + (kk ? ' · KPw ' + kk.kpw_full : '');
+  const ps = postsF().filter(p => fmtKpw === 'all' || p.username === fmtKpw); const fm = {};
   ps.forEach(p => { fm[p.format] = fm[p.format] || {e:0,n:0}; fm[p.format].e += p.engagement; fm[p.format].n++; });
   const r = Object.entries(fm).map(([k,v]) => ({k, n:v.n, e:v.e, ppp:v.e/v.n})).sort((a,b) => b.ppp - a.ppp);
   const o = baseOpts();
@@ -576,7 +633,7 @@ function renderFmt(){
   charts.fmt?.destroy();
   charts.fmt = new Chart(document.getElementById('fmtChart'), {
     type:'bar',
-    data:{labels:r.map(s => s.k + ' (' + s.n + ')'), datasets:[{data:r.map(s => s.ppp), backgroundColor:css('--s-jabar'), borderRadius:4, borderSkipped:'start', barPercentage:.62}]},
+    data:{labels:r.map(s => s.k + ' (' + s.n + ')'), datasets:[{data:r.map(s => s.ppp), backgroundColor:kk ? provColor(kk.provinsi) : css('--navy'), borderRadius:4, borderSkipped:'start', barPercentage:.62}]},
     options:o, plugins:[vl]
   });
   const tot = ps.length || 1;
@@ -753,6 +810,7 @@ function renderSearch(){
   const m = document.getElementById('srMore'); if (m) m.onclick = () => { srShowAll = !srShowAll; renderSearch(); };
 }
 
+document.getElementById('fmtKpw').addEventListener('change', e => { fmtKpw = e.target.value; renderFmt(); });
 document.getElementById('srForm').addEventListener('submit', e => { e.preventDefault(); doSearch(document.getElementById('srQ').value); });
 document.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => doSearch(b.textContent)));
 document.querySelectorAll('#heatMode button').forEach(b => b.addEventListener('click', () => {
