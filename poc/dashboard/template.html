@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <title>Engagement Sosmed KPw BI</title>
 <style>
 :root{
@@ -33,7 +34,7 @@
   --s-jabar:#4A9AE0; --s-jateng:#BE8200;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Satoshi',system-ui,sans-serif;font-size:16px;line-height:1.6}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:16px;line-height:1.6}
 a{color:var(--s-jabar)}
 .wrap{max-width:1180px;margin:0 auto;padding:0 16px}
 
@@ -244,7 +245,7 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const DATA = __DATA__;
-Chart.defaults.font.family = "'Satoshi', system-ui, -apple-system, 'Segoe UI', sans-serif";
+Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 const fmtN = n => n.toLocaleString('id-ID');
 const fmtK = n => n >= 1000 ? (n/1000).toLocaleString('id-ID',{maximumFractionDigits:1}) + ' rb' : fmtN(n);
 const fmtPct = n => n.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
@@ -355,7 +356,7 @@ function renderBar(){
       <div class="r"><span>ER</span><b>${fmtPct(s.er_avg)}</b></div>`;
   })};
   const valueLabels = {id:'vl', afterDatasetsDraw(c){
-    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px Satoshi, sans-serif'; ctx.textBaseline = 'middle';
+    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px 'Plus Jakarta Sans', sans-serif'; ctx.textBaseline = 'middle';
     c.getDatasetMeta(0).data.forEach((b,i) => ctx.fillText(mm.f(r[i][metric]), b.x + 6, b.y));
     ctx.restore();
   }};
@@ -408,7 +409,7 @@ function renderFmt(){
     return `<b>${s.k}</b><div class="r"><span>Unggahan</span><b>${s.n}</b></div><div class="r"><span>Total engagement</span><b>${fmtN(s.e)}</b></div><div class="r"><span>Per post</span><b>${fmtN(Math.round(s.ppp))}</b></div>`;
   })};
   const vl = {id:'vl2', afterDatasetsDraw(c){
-    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px Satoshi, sans-serif'; ctx.textBaseline = 'middle';
+    const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = '500 12px 'Plus Jakarta Sans', sans-serif'; ctx.textBaseline = 'middle';
     c.getDatasetMeta(0).data.forEach((b,i) => ctx.fillText(fmtN(Math.round(r[i].ppp)), b.x + 6, b.y)); ctx.restore();
   }};
   charts.fmt?.destroy();
