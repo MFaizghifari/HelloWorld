@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<title>Masuk · Social Listening KPw BI</title>
+<style>
+:root{color-scheme:light;--ink:#0D1626;--ink-2:#4A5568;--ink-3:#7B8494;--canvas:#F6F7F9;--surface:#fff;--line:#E4E7EC;--line-2:#D5DAE1;--navy:#0A3A7E;--focus:#1F5BB5;--err:#B42318}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--ink:#E9EDF3;--ink-2:#AAB4C3;--ink-3:#7E8899;--canvas:#0B111C;--surface:#111A2B;--line:#1F2B40;--line-2:#2A3850;--navy:#4F8DEB;--focus:#4F8DEB;--err:#F97066}
+  .logo-light{display:none}.logo-dark{display:block!important}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--canvas);color:var(--ink);font-family:'Public Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{display:grid;place-items:center;min-height:100vh;padding:24px 16px}
+.box{width:100%;max-width:420px}
+.cobrand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px}
+.cobrand img{height:26px}.cobrand span{color:var(--ink-3)}
+.logo-dark{display:none!important}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px 26px;box-shadow:0 12px 32px -14px rgba(13,22,38,.18)}
+h1{font-family:'Schibsted Grotesk',system-ui,sans-serif;font-weight:600;font-size:1.45rem;letter-spacing:-.02em;line-height:1.2;margin:0 0 6px}
+p{margin:0 0 20px;color:var(--ink-2);font-size:.92rem;line-height:1.5}
+label{display:block;font-size:.82rem;font-weight:600;margin-bottom:6px}
+input{width:100%;font:inherit;font-size:1rem;padding:11px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--canvas);color:var(--ink);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em}
+input:focus{outline:2px solid var(--focus);outline-offset:1px}
+button{margin-top:14px;width:100%;font:inherit;font-weight:600;font-size:.95rem;border:0;border-radius:10px;padding:12px;background:var(--navy);color:#fff;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.err{color:var(--err);font-size:.85rem;margin-top:10px;min-height:1.2em}
+.foot{text-align:center;font-size:.78rem;color:var(--ink-3);margin-top:18px;font-family:'IBM Plex Mono',monospace}
+</style>
+</head>
+<body>
+<main class="box">
+  <div class="cobrand" aria-label="Bank Indonesia × Belajarlagi">
+    <img class="logo-light" src="__LOGO_BI_BLUE__" alt="Bank Indonesia"><img class="logo-dark" src="__LOGO_BI_WHITE__" alt="Bank Indonesia">
+    <span>×</span>
+    <img class="logo-light" src="__LOGO_BL_COLOR__" alt="Belajarlagi"><img class="logo-dark" src="__LOGO_BL_WHITE__" alt="Belajarlagi">
+  </div>
+  <form class="card" id="f">
+    <h1>Monitoring &amp; Social Listening Tools KPw Bank Indonesia</h1>
+    <p>Masukkan kode akses yang Anda terima untuk membuka dashboard.</p>
+    <label for="code">Kode akses</label>
+    <input id="code" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" required autofocus>
+    <button id="btn" type="submit">Masuk</button>
+    <div class="err" id="err" role="alert"></div>
+  </form>
+  <div class="foot">Proof of concept · akses terbatas</div>
+</main>
+<script>
+const f = document.getElementById('f'), btn = document.getElementById('btn'), err = document.getElementById('err');
+f.addEventListener('submit', async e => {
+  e.preventDefault(); err.textContent = ''; btn.disabled = true; btn.textContent = 'Memeriksa…';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: document.getElementById('code').value }) });
+    if (r.ok) {
+      const next = new URLSearchParams(location.search).get('next') || '/';
+      location.href = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+      return;
+    }
+    err.textContent = (await r.json().catch(() => ({}))).error || 'Kode akses tidak dikenali';
+  } catch { err.textContent = 'Tidak bisa terhubung. Coba lagi.'; }
+  btn.disabled = false; btn.textContent = 'Masuk';
+});
+</script>
+</body>
+</html>
