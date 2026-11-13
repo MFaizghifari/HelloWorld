@@ -407,7 +407,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
       </div>
       <div class="posts" id="respList"></div>
     </section>
-    <div class="sec" id="engagement"><h2>Engagement</h2><p>Likes + komentar pada unggahan dalam periode</p></div>
+    <div class="sec" id="engagement"><h2>Engagement</h2><p>Likes + komentar pada unggahan dalam periode, ditambah views publik Reels</p></div>
 
     <div class="grid2">
       <section class="card">
@@ -420,6 +420,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
             <button data-m="engagement" aria-pressed="true">Total</button>
             <button data-m="eng_per_post" aria-pressed="false">Per post</button>
             <button data-m="er_avg" aria-pressed="false">ER</button>
+            <button data-m="views_per_reel" aria-pressed="false">Views Reels</button>
           </div>
         </div>
         <div class="chart"><canvas id="barChart" aria-label="Grafik batang engagement per KPw"></canvas></div>
@@ -438,7 +439,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
         <h2>Rekap per KPw</h2>
         <div class="sub">Klik judul kolom untuk mengurutkan · follower per tanggal penarikan data</div>
         <div class="tscroll"><table id="tbl"><thead><tr>
-          <th data-k="kpw">KPw</th><th data-k="followers">Follower</th><th data-k="posts">Post</th><th data-k="likes">Likes</th><th data-k="comments">Komentar</th><th data-k="engagement">Engagement</th><th data-k="eng_per_post">Per post</th><th data-k="er_avg">ER</th>
+          <th data-k="kpw">KPw</th><th data-k="followers">Follower</th><th data-k="posts">Post</th><th data-k="likes">Likes</th><th data-k="comments">Komentar</th><th data-k="engagement">Engagement</th><th data-k="eng_per_post">Per post</th><th data-k="er_avg">ER</th><th data-k="views">Views Reels</th><th data-k="views_per_reel">Per Reels</th>
         </tr></thead><tbody></tbody></table></div>
       </section>
       <section class="card">
@@ -538,6 +539,7 @@ const M = {
   engagement:{title:'Total engagement per KPw', sub:'Likes + komentar, seluruh unggahan dalam periode', f:fmtN},
   eng_per_post:{title:'Engagement per unggahan', sub:'Rata-rata likes + komentar per post', f:n => fmtN(Math.round(n))},
   er_avg:{title:'Engagement rate rata-rata', sub:'Rata-rata (likes + komentar) ÷ follower per post', f:fmtPct},
+  views_per_reel:{title:'Rata-rata views per Reels', sub:'Jumlah putar publik Reels ÷ jumlah Reels, per KPw', f:n => fmtN(Math.round(n))},
 };
 
 document.getElementById('heroMeta').innerHTML = [
@@ -559,7 +561,7 @@ document.getElementById('heroMeta').insertAdjacentHTML('beforeend', '<span>Data 
   const top = DATA.posts[0], topK = DATA.summary.find(s => s.username === top.username);
   document.getElementById('mLimits').innerHTML = li([
     'Hanya metrik publik. Reach, impressions, saves, dan shares hanya tersedia lewat akses resmi akun (Meta Graph API).',
-    'Jumlah views Reels belum tersedia dari sumber data publik, sehingga belum dihitung dalam engagement.',
+    'Views hanya tersedia untuk Reels/video: angka jumlah putar yang ditampilkan publik oleh Instagram (termasuk putar ulang). Foto dan carousel tidak menampilkan views secara publik. Views dilaporkan terpisah dan tidak dihitung dalam engagement.',
     'Follower adalah angka saat data ditarik, bukan per tanggal unggah.',
     `Satu unggahan viral bisa menggeser total. Unggahan teratas (KPw ${top.kpw}, ${fmtD(top.date)}) meraih ${fmtN(top.engagement)} engagement, ${Math.round(top.engagement / topK.engagement * 100)}% dari total akun itu. Bandingkan juga <b>Per post</b> dan <b>ER</b>.`,
     'Rata-rata dari 1–2 unggahan (misalnya sel kecil di peta topik) mudah dipengaruhi satu unggahan, jadi baca bersama jumlah unggahannya.',
@@ -577,10 +579,11 @@ function renderTiles(){
   const fol = r.reduce((a,s) => a + s.followers, 0);
   const er = ps.length ? ps.reduce((a,p) => a + p.er, 0) / ps.length : 0;
   const lok = ps.filter(p => p.cakupan === 'lokal').length;
+  const reels = ps.filter(p => p.views != null), views = reels.reduce((a,p) => a + p.views, 0);
   const t = [
     ['Total engagement', fmtN(eng), 'likes + komentar'],
     ['Unggahan', fmtN(n), 'rata-rata ' + Math.round(n / (r.length || 1)) + ' per KPw'],
-    ['Engagement per post', fmtN(Math.round(eng / (n || 1))), 'semua format'],
+    ['Views Reels', fmtN(views), 'rata-rata ' + fmtN(Math.round(views / (reels.length || 1))) + ' per Reels'],
     ['ER rata-rata', fmtPct(er), 'engagement ÷ follower'],
     ['Konten lokal', Math.round(lok / (ps.length || 1) * 100) + '%', 'sisanya materi BI Pusat'],
   ];
@@ -647,7 +650,9 @@ function renderBar(){
       <div class="r"><span>Engagement</span><b>${fmtN(s.engagement)}</b></div>
       <div class="r"><span>Unggahan</span><b>${s.posts}</b></div>
       <div class="r"><span>Per post</span><b>${fmtN(Math.round(s.eng_per_post))}</b></div>
-      <div class="r"><span>ER</span><b>${fmtPct(s.er_avg)}</b></div>`;
+      <div class="r"><span>ER</span><b>${fmtPct(s.er_avg)}</b></div>
+      <div class="r"><span>Views Reels</span><b>${fmtN(s.views)}</b></div>
+      <div class="r"><span>Per Reels (${s.reels})</span><b>${fmtN(s.views_per_reel)}</b></div>`;
   })};
   const valueLabels = {id:'vl', afterDatasetsDraw(c){
     const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = "600 12px 'Public Sans', sans-serif"; ctx.textBaseline = 'middle';
@@ -700,14 +705,14 @@ function renderFmt(){
   const kk = ks.find(k => k.username === fmtKpw);
   document.getElementById('fmtSub').textContent = 'Rata-rata likes + komentar per unggahan' + (kk ? ' · KPw ' + kk.kpw_full : '');
   const ps = postsF().filter(p => fmtKpw === 'all' || p.username === fmtKpw); const fm = {};
-  ps.forEach(p => { fm[p.format] = fm[p.format] || {e:0,n:0}; fm[p.format].e += p.engagement; fm[p.format].n++; });
-  const r = Object.entries(fm).map(([k,v]) => ({k, n:v.n, e:v.e, ppp:v.e/v.n})).sort((a,b) => b.ppp - a.ppp);
+  ps.forEach(p => { fm[p.format] = fm[p.format] || {e:0,n:0,v:0,vn:0}; fm[p.format].e += p.engagement; fm[p.format].n++; if (p.views != null){ fm[p.format].v += p.views; fm[p.format].vn++; } });
+  const r = Object.entries(fm).map(([k,v]) => ({k, n:v.n, e:v.e, ppp:v.e/v.n, vpp:v.vn ? v.v/v.vn : null})).sort((a,b) => b.ppp - a.ppp);
   const o = baseOpts();
   o.indexAxis = 'y'; o.scales.y.grid.display = false; o.layout = {padding:{right:48}};
   o.scales.x.ticks.callback = v => fmtN(v);
   o.plugins.tooltip = {enabled:false, external: externalTip(dp => {
     const s = r[dp[0].dataIndex];
-    return `<b>${s.k}</b><div class="r"><span>Unggahan</span><b>${s.n}</b></div><div class="r"><span>Total engagement</span><b>${fmtN(s.e)}</b></div><div class="r"><span>Per post</span><b>${fmtN(Math.round(s.ppp))}</b></div>`;
+    return `<b>${s.k}</b><div class="r"><span>Unggahan</span><b>${s.n}</b></div><div class="r"><span>Total engagement</span><b>${fmtN(s.e)}</b></div><div class="r"><span>Per post</span><b>${fmtN(Math.round(s.ppp))}</b></div>${s.vpp != null ? `<div class="r"><span>Views per Reels</span><b>${fmtN(Math.round(s.vpp))}</b></div>` : ''}`;
   })};
   const vl = {id:'vl2', afterDatasetsDraw(c){
     const {ctx} = c; ctx.save(); ctx.fillStyle = css('--text'); ctx.font = "600 12px 'Public Sans', sans-serif"; ctx.textBaseline = 'middle';
@@ -720,7 +725,8 @@ function renderFmt(){
     options:o, plugins:[vl]
   });
   const tot = ps.length || 1;
-  document.getElementById('fmtNote').textContent = 'Komposisi unggahan: ' + r.map(s => s.k + ' ' + Math.round(s.n/tot*100) + '%').join(' · ');
+  const rv = r.find(s => s.vpp != null);
+  document.getElementById('fmtNote').textContent = 'Komposisi unggahan: ' + r.map(s => s.k + ' ' + Math.round(s.n/tot*100) + '%').join(' · ') + (rv ? ' · Reels rata-rata ' + fmtN(Math.round(rv.vpp)) + ' views' : '');
 }
 
 function renderTable(){
@@ -732,7 +738,7 @@ function renderTable(){
   tb.innerHTML = r.map(s => `<tr>
     <td><div class="kp"><i style="background:${provColor(s.provinsi)}"></i><div>${s.kpw}<div class="u">@${s.username}</div></div></div></td>
     <td>${fmtN(s.followers)}</td><td>${s.posts}</td><td>${fmtN(s.likes)}</td><td>${fmtN(s.comments)}</td>
-    <td><b>${fmtN(s.engagement)}</b></td><td>${fmtN(Math.round(s.eng_per_post))}</td><td>${fmtPct(s.er_avg)}</td></tr>`).join('');
+    <td><b>${fmtN(s.engagement)}</b></td><td>${fmtN(Math.round(s.eng_per_post))}</td><td>${fmtPct(s.er_avg)}</td><td>${fmtN(s.views)}</td><td>${fmtN(s.views_per_reel)}</td></tr>`).join('');
   document.querySelectorAll('#tbl th').forEach(th => {
     const k = th.dataset.k; th.textContent = th.textContent.replace(/ [▲▼]$/,'');
     if (k === sortK) th.textContent += sortDir < 0 ? ' ▼' : ' ▲';
@@ -746,7 +752,7 @@ function renderPosts(){
     <span class="rk">${i+1}</span>
     <span style="min-width:0"><div class="cap">${esc(p.caption || '(tanpa caption)')}</div>
       <div class="pm"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${provColor(p.provinsi)}"></i>KPw ${p.kpw} · ${fmtD(p.date)} <span class="tag">${p.format}</span>${p.topik ? `<span class="tag">${TL[p.topik]}</span>` : ''}${p.collab ? '<span class="tag">Kolaborasi</span>' : ''}</div></span>
-    <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar</small></span></a>`).join('');
+    <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar${p.views != null ? ' · ' + fmtN(p.views) + ' views' : ''}</small></span></a>`).join('');
 }
 
 function renderAll(){ renderCamp(); renderVoice(); renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); renderHeat(); renderAI(); if (lastSearch) renderSearch(); }
@@ -780,7 +786,7 @@ function postRow(p, i, extra = ''){
     <span style="min-width:0"><div class="rs">${esc(p.ringkasan || p.caption || '')}</div>
       <div class="cx">${esc(p.caption || '')}</div>
       <div class="pm"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${provColor(p.provinsi)}"></i>KPw ${p.kpw} · ${fmtD(p.date)} ${extra}<span class="tag">${TL[p.topik] || ''}</span><span class="tag">${p.cakupan === 'nasional' ? 'Materi nasional' : 'Konten lokal'}</span></div></span>
-    <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar</small></span></a>`;
+    <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar${p.views != null ? ' · ' + fmtN(p.views) + ' views' : ''}</small></span></a>`;
 }
 
 function renderHeat(){

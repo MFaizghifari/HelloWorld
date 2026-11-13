@@ -87,7 +87,7 @@ for p in posts_raw:
         "format": FORMAT.get(p.get("productType"), p.get("type")),
         "likes": likes,
         "comments": comments,
-        "views": p.get("videoViewCount") or 0,
+        "views": (p.get("videoPlayCount") or p.get("videoViewCount") or 0) if p.get("type") == "Video" else None,  # public play count, Reels/video only
         "engagement": eng,
         "er": round(eng / followers * 100, 3) if followers else 0,
         "collab": p.get("ownerUsername") != acc["username"],
@@ -110,7 +110,9 @@ for a in accounts:
         "collab_posts": sum(p["collab"] for p in ps),
         "likes": sum(p["likes"] for p in ps),
         "comments": sum(p["comments"] for p in ps),
-        "views": sum(p["views"] for p in ps),
+        "views": sum(p["views"] or 0 for p in ps),
+        "reels": sum(p["views"] is not None for p in ps),
+        "views_per_reel": round(sum(p["views"] or 0 for p in ps) / max(1, sum(p["views"] is not None for p in ps))),
         "engagement": eng,
         "eng_per_post": round(eng / len(ps), 1) if ps else 0,
         "er_avg": round(sum(p["er"] for p in ps) / len(ps), 3) if ps else 0,
@@ -126,10 +128,11 @@ daily = {prov: collections.Counter() for prov in PROVINCES}
 for p in posts:
     daily[p["provinsi"]][p["date"]] += p["engagement"]
 
-fmt = collections.defaultdict(lambda: {"posts": 0, "engagement": 0})
+fmt = collections.defaultdict(lambda: {"posts": 0, "engagement": 0, "views": 0})
 for p in posts:
     fmt[p["format"]]["posts"] += 1
     fmt[p["format"]]["engagement"] += p["engagement"]
+    fmt[p["format"]]["views"] += p["views"] or 0
 
 out = {
     # time the Apify pull ran (apify_run.py writes it); fall back to build time
