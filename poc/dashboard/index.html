@@ -83,6 +83,18 @@ code{font-family:var(--mono);font-size:.85em}
 .chip:hover{color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow),0 0 0 1px var(--line)}
 .chip .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:0}
+.kbarf{position:sticky;top:60px;z-index:15;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);margin:0 -4px 20px;padding:10px 4px;border-bottom:1px solid transparent}
+.kbarf .row{display:flex;align-items:center;gap:10px}
+.kbarf .rg{font-size:.72rem;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.kbarf .filters{display:flex;flex:1;min-width:0;flex-wrap:wrap;row-gap:2px}
+.kbarf .row{align-items:flex-start}.kbarf .rg{padding-top:9px}
+.kbarf .chip{padding:6px 11px;font-size:.82rem}
+.kbarf .sep{width:1px;align-self:stretch;margin:4px 3px;background:var(--line-2);flex:none}
+.kbarf .hint{font-size:.78rem;color:var(--ink-3);margin-top:6px;min-height:1em}
+#tbl tr.dim,#voiceTbl tr.dim{opacity:.38}
+td.dim,th.dim{opacity:.3}
+th.hl{color:var(--ink);box-shadow:inset 0 -2px 0 var(--navy)}
+.kbar.dim{opacity:.35}
 
 /* the ask: search phrased as the question */
 .ask{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);padding:26px 28px 22px;margin-bottom:20px}
@@ -268,7 +280,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
   .flow{grid-template-columns:1fr}.flow li{border-left:0!important}.flow li+li{border-top:1px solid var(--line)}
   .wrap{padding:0 16px}.appbar .wrap{gap:10px}.poc{display:none}.cobrand img{height:22px}
   .phead{padding-top:24px}.phead h1{font-size:1.5rem}
-  .filters{width:100%;overflow-x:auto}.chip{flex:1;padding:7px 8px}
+  .kbarf .rg{display:none}.kbarf{top:56px}.kbarf .filters{flex-wrap:nowrap;overflow-x:auto}
   .ask{padding:20px 18px;border-radius:16px}.ask-q{font-size:1.25rem}.search{flex-basis:100%}.btn{padding:9px 14px}.btn kbd{display:none}
   .kpis{grid-template-columns:repeat(2,1fr)}.tile{border-left:0!important;border-top:1px solid var(--line)}.tile:first-child{grid-column:1/-1;border-top:0}.tile:nth-child(odd):not(:first-child){border-left:1px solid var(--line)!important}.tile .n{font-size:1.5rem}
   .kbar{grid-template-columns:84px 1fr 28px}
@@ -304,11 +316,17 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
         <h1>Monitoring &amp; Social Listening Tools KPw Bank Indonesia</h1>
         <p id="heroSub">Apa yang diunggah kantor perwakilan, topik dan kampanye apa yang diangkat, dan bagaimana respons publiknya.</p>
       </div>
-      <div class="filters" role="group" aria-label="Filter provinsi">
-        <span class="lbl">Provinsi</span>
-        <button class="chip" data-prov="all" aria-pressed="true">Semua</button>
-      </div>
     </div>
+
+    <nav class="kbarf" aria-label="Filter KPw">
+      <div class="row">
+        <span class="rg" id="kRegion">Pulau Jawa</span>
+        <div class="filters" role="group" aria-label="Pilih KPw">
+          <button class="chip" data-u="all" aria-pressed="true">Semua KPw</button>
+        </div>
+      </div>
+      <div class="hint" id="kHint"></div>
+    </nav>
 
     <section class="ask" aria-labelledby="askLabel">
       <div class="ask-q">
@@ -428,8 +446,8 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
       </section>
       <section class="card">
         <h2>Engagement harian</h2>
-        <div class="sub">Total likes + komentar per hari, menurut tanggal unggah</div>
-        <div class="chart"><canvas id="lineChart" aria-label="Grafik garis engagement harian per provinsi"></canvas></div>
+        <div class="sub" id="lineSub">Total likes + komentar per hari, menurut tanggal unggah</div>
+        <div class="chart"><canvas id="lineChart" aria-label="Grafik garis engagement harian"></canvas></div>
         <div class="legend" id="lineLegend"></div>
       </section>
     </div>
@@ -448,7 +466,6 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
             <h2>Engagement per format konten</h2>
             <div class="sub" id="fmtSub">Rata-rata likes + komentar per unggahan</div>
           </div>
-          <select class="kpw" id="fmtKpw" aria-label="Pilih KPw untuk grafik format"></select>
         </div>
         <div class="chart" style="height:220px"><canvas id="fmtChart" aria-label="Grafik batang engagement per format"></canvas></div>
         <div class="sub" id="fmtNote" style="margin-top:8px"></div>
@@ -530,9 +547,10 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 const PVAR = {'DKI Jakarta':'--p-dki','Banten':'--p-banten','Jawa Barat':'--p-jabar','Jawa Tengah':'--p-jateng','DI Yogyakarta':'--p-diy','Jawa Timur':'--p-jatim'};
 const provColor = p => css(PVAR[p] || '--ink-3');
 const PROVS = DATA.provinces;
-document.querySelector('.filters').insertAdjacentHTML('beforeend', PROVS.map(p => `<button class="chip" data-prov="${p}" aria-pressed="false"><span class="dot" style="background:var(${PVAR[p]})"></span>${p.replace('DI Yogyakarta','DIY').replace('DKI Jakarta','DKI')}</button>`).join(''));
+document.querySelector('.kbarf .filters').insertAdjacentHTML('beforeend', PROVS.map(p => '<span class="sep" aria-hidden="true"></span>' + DATA.summary.filter(s => s.provinsi === p).map(s => `<button class="chip" data-u="${s.username}" aria-pressed="false" title="KPw ${s.kpw_full} · @${s.username}"><span class="dot" style="background:var(${PVAR[p]})"></span>${s.kpw}</button>`).join('')).join(''));
+document.getElementById('kRegion').textContent = 'Pulau Jawa · ' + DATA.summary.length + ' KPw';
 document.getElementById('barLegend').innerHTML = PROVS.map(p => `<span><i style="background:var(${PVAR[p]})"></i>${p}</span>`).join('');
-let prov = 'all', metric = 'engagement', sortK = 'engagement', sortDir = -1;
+let selU = 'all', metric = 'engagement', sortK = 'engagement', sortDir = -1;
 const charts = {};
 
 const M = {
@@ -569,8 +587,13 @@ document.getElementById('heroMeta').insertAdjacentHTML('beforeend', '<span>Data 
   ]);
 })();
 
-function rows(){ return DATA.summary.filter(s => prov === 'all' || s.provinsi === prov); }
-function postsF(){ return DATA.posts.filter(p => prov === 'all' || p.provinsi === prov); }
+// selU = selected KPw account. Account views filter to it; comparison views (bar, table, heatmap, campaigns) keep all KPw and dim the rest.
+function rows(){ return DATA.summary.filter(s => selU === 'all' || s.username === selU); }
+function postsF(){ return DATA.posts.filter(p => selU === 'all' || p.username === selU); }
+const selK = () => DATA.summary.find(s => s.username === selU);
+const dimU = u => selU !== 'all' && u !== selU;
+const fade = c => /^#[0-9a-f]{6}$/i.test(c) ? c + '40' : c;
+const rankOf = (k, key) => [...DATA.summary].sort((a,b) => b[key] - a[key]).findIndex(s => s.username === k.username) + 1;
 
 function renderTiles(){
   const r = rows(), ps = postsF();
@@ -582,7 +605,7 @@ function renderTiles(){
   const reels = ps.filter(p => p.views != null), views = reels.reduce((a,p) => a + p.views, 0);
   const t = [
     ['Total engagement', fmtN(eng), 'likes + komentar'],
-    ['Unggahan', fmtN(n), 'rata-rata ' + Math.round(n / (r.length || 1)) + ' per KPw'],
+    ['Unggahan', fmtN(n), selU === 'all' ? 'rata-rata ' + Math.round(n / (r.length || 1)) + ' per KPw' : 'peringkat ' + rankOf(r[0], 'posts') + ' dari ' + DATA.summary.length + ' KPw'],
     ['Views Reels', fmtN(views), 'rata-rata ' + fmtN(Math.round(views / (reels.length || 1))) + ' per Reels'],
     ['ER rata-rata', fmtPct(er), 'engagement ÷ follower'],
     ['Konten lokal', Math.round(lok / (ps.length || 1) * 100) + '%', 'sisanya materi BI Pusat'],
@@ -602,6 +625,16 @@ function renderInsight(){
   ps.forEach(p => { fm[p.format] = fm[p.format] || {e:0,n:0}; fm[p.format].e += p.engagement; fm[p.format].n++; });
   const bestF = Object.entries(fm).sort((a,b) => b[1].e/b[1].n - a[1].e/a[1].n)[0];
   const share = total ? Math.round(byEng[0].engagement / total * 100) : 0;
+  if (selU !== 'all'){
+    const k = r[0], N = DATA.summary.length, all = DATA.summary.reduce((a,s) => a + s.engagement, 0);
+    const avgE = all / N, avgR = DATA.summary.reduce((a,s) => a + s.views_per_reel, 0) / N;
+    document.getElementById('insight').innerHTML = `<b>Temuan utama · KPw ${k.kpw_full}</b><ul>
+    <li>Engagement <b>${fmtN(k.engagement)}</b>, peringkat <b>${rankOf(k,'engagement')} dari ${N}</b> (${Math.round(k.engagement / all * 100)}% dari total ${N} KPw; ${k.engagement >= avgE ? (Math.round(k.engagement / avgE * 10) / 10).toLocaleString('id-ID') + '× rata-rata KPw' : Math.round(k.engagement / avgE * 100) + '% dari rata-rata KPw'}).</li>
+    <li>ER <b>${fmtPct(k.er_avg)}</b> (peringkat ${rankOf(k,'er_avg')}) dengan ${fmtN(k.followers)} follower; per unggahan ${fmtN(Math.round(k.eng_per_post))} (peringkat ${rankOf(k,'eng_per_post')}).</li>
+    <li>${top ? `Unggahan teratas (${fmtD(top.date)}, ${top.format}) meraih ${fmtN(top.engagement)}, ${k.engagement ? Math.round(top.engagement / k.engagement * 100) : 0}% dari engagement akun ini.` : 'Belum ada unggahan.'}</li>
+    <li>${k.reels ? `${k.reels} Reels, rata-rata <b>${fmtN(k.views_per_reel)} views</b> (peringkat ${rankOf(k,'views_per_reel')}; rata-rata KPw ${fmtN(Math.round(avgR))}).` : 'Tidak ada Reels dalam periode.'}${bestF ? ` Format terkuat: <b>${bestF[0]}</b> (${fmtN(Math.round(bestF[1].e/bestF[1].n))} per post).` : ''}</li></ul>`;
+    return;
+  }
   document.getElementById('insight').innerHTML = `<b>Temuan utama</b><ul>
     <li><b>KPw ${byEng[0].kpw}</b> menyumbang ${share}% dari total engagement (${fmtN(byEng[0].engagement)}).</li>
     <li>ER tertinggi: <b>${byEr[0].kpw}</b> (${fmtPct(byEr[0].er_avg)})${byEr[1] ? `, disusul <b>${byEr[1].kpw}</b> (${fmtPct(byEr[1].er_avg)})${byEr[1].followers < byEr[0].followers/2 ? ` dengan follower hanya ${Math.round(byEr[1].followers/byEr[0].followers*100)}% dari ${byEr[0].kpw}` : ''}` : ''}.</li>
@@ -635,7 +668,7 @@ function externalTip(html){
 }
 
 function renderBar(){
-  const r = [...rows()].sort((a,b) => b[metric] - a[metric]);
+  const r = [...DATA.summary].sort((a,b) => b[metric] - a[metric]);
   const mm = M[metric];
   document.getElementById('barTitle').textContent = mm.title;
   document.getElementById('barSub').textContent = mm.sub;
@@ -662,14 +695,19 @@ function renderBar(){
   charts.bar?.destroy();
   charts.bar = new Chart(document.getElementById('barChart'), {
     type:'bar',
-    data:{labels:r.map(s => s.kpw), datasets:[{data:r.map(s => s[metric]), backgroundColor:r.map(s => provColor(s.provinsi)), borderRadius:4, borderSkipped:'start', barPercentage:.72, categoryPercentage:.9}]},
+    data:{labels:r.map(s => s.kpw), datasets:[{data:r.map(s => s[metric]), backgroundColor:r.map(s => dimU(s.username) ? fade(provColor(s.provinsi)) : provColor(s.provinsi)), borderRadius:4, borderSkipped:'start', barPercentage:.72, categoryPercentage:.9}]},
     options:o, plugins:[valueLabels]
   });
 }
 
 function renderLine(){
-  const days = DATA.daily.days;
-  const show = PROVS.filter(p => prov === 'all' || p === prov);
+  const days = DATA.daily.days, N = DATA.summary.length;
+  const per = u => days.map(d => DATA.posts.filter(p => p.date === d && (!u || p.username === u)).reduce((a,p) => a + p.engagement, 0));
+  const total = per(null), k = selK();
+  const show = k
+    ? [{label:'KPw ' + k.kpw, data:per(k.username), c:provColor(k.provinsi), dash:[]}, {label:'Rata-rata per KPw', data:total.map(v => Math.round(v / N)), c:css('--ink-3'), dash:[4,4]}]
+    : [{label:'Semua ' + N + ' KPw', data:total, c:css('--navy'), dash:[]}];
+  document.getElementById('lineSub').textContent = k ? 'Likes + komentar per hari, dibandingkan rata-rata ' + N + ' KPw' : 'Total likes + komentar per hari, menurut tanggal unggah';
   const o = baseOpts();
   o.interaction = {mode:'index', intersect:false};
   o.scales.x.grid.display = false;
@@ -679,7 +717,8 @@ function renderLine(){
   o.scales.y.beginAtZero = true;
   o.plugins.tooltip = {enabled:false, external: externalTip(dp => {
     const d = days[dp[0].dataIndex];
-    return `<b>${fmtD(d)} 2026</b>` + dp.map(p => `<div class="r"><span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${p.dataset.borderColor}"></i>${p.dataset.label}</span><b>${fmtN(p.raw)}</b></div>`).join('');
+    const np = DATA.posts.filter(p => p.date === d && (!k || p.username === k.username)).length;
+    return `<b>${fmtD(d)} 2026</b>` + dp.map(p => `<div class="r"><span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${p.dataset.borderColor}"></i>${p.dataset.label}</span><b>${fmtN(p.raw)}</b></div>`).join('') + `<div class="r"><span>Unggahan${k ? ' KPw' : ''}</span><b>${np}</b></div>`;
   })};
   const crosshair = {id:'ch', afterDraw(c){
     const a = c.tooltip?.getActiveElements?.(); if (!a?.length) return;
@@ -690,21 +729,16 @@ function renderLine(){
   charts.line?.destroy();
   charts.line = new Chart(document.getElementById('lineChart'), {
     type:'line',
-    data:{labels:days.map(fmtD), datasets:show.map(p => ({label:p, data:DATA.daily[p], borderColor:provColor(p), backgroundColor:provColor(p), borderWidth:2, pointRadius:0, pointHoverRadius:5, pointHoverBorderWidth:2, pointHoverBorderColor:css('--surface'), tension:.25}))},
+    data:{labels:days.map(fmtD), datasets:show.map(x => ({label:x.label, data:x.data, borderColor:x.c, backgroundColor:x.c, borderDash:x.dash, borderWidth:2, pointRadius:0, pointHoverRadius:5, pointHoverBorderWidth:2, pointHoverBorderColor:css('--surface'), tension:.25}))},
     options:o, plugins:[crosshair]
   });
-  document.getElementById('lineLegend').innerHTML = show.map(p => `<span><i style="background:${provColor(p)}"></i>Provinsi ${p} (${DATA.summary.filter(s => s.provinsi === p).length} KPw): ${fmtN(DATA.daily[p].reduce((a,b) => a+b, 0))}</span>`).join('');
+  document.getElementById('lineLegend').innerHTML = show.map(x => `<span><i style="background:${x.c}"></i>${x.label}: ${fmtN(x.data.reduce((a,b) => a+b, 0))}</span>`).join('');
 }
 
-let fmtKpw = 'all';
 function renderFmt(){
-  const sel = document.getElementById('fmtKpw'), ks = rows();
-  if (fmtKpw !== 'all' && !ks.some(k => k.username === fmtKpw)) fmtKpw = 'all';
-  sel.innerHTML = `<option value="all">${prov === 'all' ? 'Semua KPw' : 'Semua KPw ' + prov}</option>` + ks.map(k => `<option value="${k.username}">KPw ${k.kpw}</option>`).join('');
-  sel.value = fmtKpw;
-  const kk = ks.find(k => k.username === fmtKpw);
-  document.getElementById('fmtSub').textContent = 'Rata-rata likes + komentar per unggahan' + (kk ? ' · KPw ' + kk.kpw_full : '');
-  const ps = postsF().filter(p => fmtKpw === 'all' || p.username === fmtKpw); const fm = {};
+  const kk = selK();
+  document.getElementById('fmtSub').textContent = 'Rata-rata likes + komentar per unggahan · ' + (kk ? 'KPw ' + kk.kpw_full : 'semua KPw');
+  const ps = postsF(); const fm = {};
   ps.forEach(p => { fm[p.format] = fm[p.format] || {e:0,n:0,v:0,vn:0}; fm[p.format].e += p.engagement; fm[p.format].n++; if (p.views != null){ fm[p.format].v += p.views; fm[p.format].vn++; } });
   const r = Object.entries(fm).map(([k,v]) => ({k, n:v.n, e:v.e, ppp:v.e/v.n, vpp:v.vn ? v.v/v.vn : null})).sort((a,b) => b.ppp - a.ppp);
   const o = baseOpts();
@@ -730,12 +764,12 @@ function renderFmt(){
 }
 
 function renderTable(){
-  const r = [...rows()].sort((a,b) => {
+  const r = [...DATA.summary].sort((a,b) => {
     const x = a[sortK], y = b[sortK];
     return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir;
   });
   const tb = document.querySelector('#tbl tbody');
-  tb.innerHTML = r.map(s => `<tr>
+  tb.innerHTML = r.map(s => `<tr${dimU(s.username) ? ' class="dim"' : ''}>
     <td><div class="kp"><i style="background:${provColor(s.provinsi)}"></i><div>${s.kpw}<div class="u">@${s.username}</div></div></div></td>
     <td>${fmtN(s.followers)}</td><td>${s.posts}</td><td>${fmtN(s.likes)}</td><td>${fmtN(s.comments)}</td>
     <td><b>${fmtN(s.engagement)}</b></td><td>${fmtN(Math.round(s.eng_per_post))}</td><td>${fmtPct(s.er_avg)}</td><td>${fmtN(s.views)}</td><td>${fmtN(s.views_per_reel)}</td></tr>`).join('');
@@ -757,11 +791,15 @@ function renderPosts(){
 
 function renderAll(){ renderCamp(); renderVoice(); renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); renderHeat(); renderAI(); if (lastSearch) renderSearch(); }
 
-document.querySelectorAll('.filters .chip').forEach(b => b.addEventListener('click', () => {
-  prov = b.dataset.prov;
-  document.querySelectorAll('.filters .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+function setKpw(u){
+  selU = u; heatSel = null; campSel = null;
+  document.querySelectorAll('.kbarf .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.u === u));
+  const k = selK();
+  document.getElementById('kHint').textContent = k ? `Menampilkan KPw ${k.kpw_full} (@${k.username}). Grafik perbandingan tetap memuat semua KPw, KPw lain diredupkan.` : '';
+  try { const sp = new URLSearchParams(location.search); u === 'all' ? sp.delete('kpw') : sp.set('kpw', u); history.replaceState(null, '', sp.toString() ? '?' + sp : location.pathname); } catch (e) {}
   renderAll();
-}));
+}
+document.querySelectorAll('.kbarf .chip').forEach(b => b.addEventListener('click', () => setKpw(b.dataset.u)));
 document.querySelectorAll('.seg button[data-m]').forEach(b => b.addEventListener('click', () => {
   metric = b.dataset.m;
   document.querySelectorAll('.seg button[data-m]').forEach(x => x.setAttribute('aria-pressed', x === b));
@@ -790,7 +828,7 @@ function postRow(p, i, extra = ''){
 }
 
 function renderHeat(){
-  const ks = rows(), ps = postsF();
+  const ks = DATA.summary, ps = DATA.posts;
   const cell = (t, k) => { const xs = ps.filter(p => p.username === k.username && hasT(p, t)); const e = xs.reduce((a,p) => a + p.engagement, 0); return {n: xs.length, e, epp: xs.length ? e / xs.length : 0}; };
   const tops = DATA.topics.map(t => {
     const cs = ks.map(k => cell(t.id, k)); const n = cs.reduce((a,c) => a + c.n, 0), e = cs.reduce((a,c) => a + c.e, 0);
@@ -802,10 +840,11 @@ function renderHeat(){
   const max = vals.length ? vals[Math.min(vals.length - 1, Math.floor(vals.length * (heatMode === 'n' ? 1 : .95)))] || 1 : 1;
   document.getElementById('heatSub').textContent = (heatMode === 'n' ? 'Jumlah unggahan' : 'Rata-rata likes + komentar per unggahan') + (heatScope === 'utama' ? ' menurut topik utama.' : ' menurut topik utama dan topik yang ikut dibahas (satu unggahan bisa terhitung di beberapa topik).') + ' Klik sel untuk melihat unggahannya.';
   const fv = v => heatMode === 'n' ? v : fmtN(Math.round(v));
-  document.getElementById('heat').innerHTML = `<thead><tr><th>Topik</th>${ks.map(k => `<th><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">${heatMode === 'n' ? 'Total' : 'Semua'}</th></tr></thead><tbody>` +
+  document.getElementById('heat').innerHTML = `<thead><tr><th>Topik</th>${ks.map(k => `<th class="${dimU(k.username) ? 'dim' : selU === k.username ? 'hl' : ''}"><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">${heatMode === 'n' ? 'Total' : 'Semua'}</th></tr></thead><tbody>` +
     tops.map(r => `<tr><td class="tl" data-t="${r.t.id}" title="${esc(r.t.desc)}">${r.t.label}</td>${r.cs.map((c, i) => {
       const v = val(c), f = Math.min(1, v / max), sel = heatSel && heatSel.t === r.t.id && heatSel.u === ks[i].username;
-      return c.n ? `<td class="c${sel ? ' sel' : ''}" data-t="${r.t.id}" data-u="${ks[i].username}" data-i="${i}" style="background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}">${fv(v)}</td>` : `<td class="c z">·</td>`;
+      const dm = dimU(ks[i].username) ? ' dim' : '';
+      return c.n ? `<td class="c${sel ? ' sel' : ''}${dm}" data-t="${r.t.id}" data-u="${ks[i].username}" data-i="${i}" style="background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}">${fv(v)}</td>` : `<td class="c z${dm}">·</td>`;
     }).join('')}<td class="tot">${fv(heatMode === 'n' ? r.n : r.epp)}</td></tr>`).join('') + '</tbody>';
   document.getElementById('heatScale').innerHTML = `<span>0</span><span class="g"></span><span>${fv(max)}${heatMode === 'epp' ? '+' : ''}</span><span style="margin-left:8px">${heatMode === 'epp' ? 'Sel dengan 1–2 unggahan bisa sangat dipengaruhi satu post viral.' : ''}</span>`;
   const tt = tooltipEl();
@@ -868,28 +907,29 @@ async function doSearch(q){
     lastSearch = localSearch(q);
   }
   btn.disabled = false;
-  try { history.replaceState(null, '', '?q=' + encodeURIComponent(q)); } catch (e) {}
+  try { const sp = new URLSearchParams(location.search); sp.set('q', q); history.replaceState(null, '', '?' + sp); } catch (e) {}
   renderSearch();
 }
 
 function renderSearch(){
   const S = lastSearch, out = document.getElementById('srOut');
-  const ks = rows();
-  const res = S.results.map(r => ({...r, p: BYID[r.id]})).filter(r => r.p && (prov === 'all' || r.p.provinsi === prov));
+  const ks = DATA.summary, k0 = selK();
+  const resAll = S.results.map(r => ({...r, p: BYID[r.id]})).filter(r => r.p);
+  const res = resAll.filter(r => selU === 'all' || r.p.username === selU);
   res.sort((a,b) => (a.rel === 'utama' ? 0 : 1) - (b.rel === 'utama' ? 0 : 1) || b.s - a.s);
-  const cnt = ks.map(k => ({k, m: res.filter(r => r.p.username === k.username && r.rel === 'utama').length, s: res.filter(r => r.p.username === k.username && r.rel !== 'utama').length}))
+  const cnt = ks.map(k => ({k, m: resAll.filter(r => r.p.username === k.username && r.rel === 'utama').length, s: resAll.filter(r => r.p.username === k.username && r.rel !== 'utama').length}))
     .sort((a,b) => (b.m + b.s) - (a.m + a.s) || b.m - a.m);
   const max = Math.max(1, ...cnt.map(c => c.m + c.s));
   const nm = res.filter(r => r.rel === 'utama').length, ns = res.length - nm;
   const none = cnt.filter(c => !c.m && !c.s).map(c => c.k.kpw);
   const head = S.offline
     ? `<div class="answer"><div class="lbl">Mode kata kunci</div>Layanan AI tidak terjangkau dari halaman ini, jadi hasil di bawah memakai pencocokan kata pada caption.</div>`
-    : (S.jawaban ? `<div class="answer"><div class="lbl">Jawaban AI · Gemini</div><b>${nm} unggahan</b> membahas “${esc(S.q)}” sebagai topik utama dan <b>${ns}</b> menyinggungnya${prov !== 'all' ? ' (Provinsi ' + prov + ')' : ''}${none.length ? `; tidak ditemukan di KPw ${none.join(', ')}` : ''}. ${esc(S.jawaban)}</div>` : '');
+    : (S.jawaban ? `<div class="answer"><div class="lbl">Jawaban AI · Gemini</div><b>${nm} unggahan</b> membahas “${esc(S.q)}” sebagai topik utama dan <b>${ns}</b> menyinggungnya${k0 ? ' di KPw ' + k0.kpw : ''}${!k0 && none.length ? `; tidak ditemukan di KPw ${none.join(', ')}` : ''}. ${esc(S.jawaban)}</div>` : '');
   const shown = srShowAll ? res : res.slice(0, 12);
   out.innerHTML = head + (res.length ? `<div class="sr-grid">
     <div>
       <div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Unggahan per KPw</div>
-      <div class="kbars">${cnt.map(c => `<div class="kbar${c.m + c.s ? '' : ' zero'}"><span class="nm">${c.k.kpw}</span><span class="track">${c.m ? `<i class="c-main" style="width:${c.m / max * 100}%"></i>` : ''}${c.s ? `<i class="c-side" style="width:${c.s / max * 100}%"></i>` : ''}</span><span class="v">${c.m + c.s}</span></div>`).join('')}</div>
+      <div class="kbars">${cnt.map(c => `<div class="kbar${c.m + c.s ? '' : ' zero'}${dimU(c.k.username) ? ' dim' : ''}"><span class="nm">${c.k.kpw}</span><span class="track">${c.m ? `<i class="c-main" style="width:${c.m / max * 100}%"></i>` : ''}${c.s ? `<i class="c-side" style="width:${c.s / max * 100}%"></i>` : ''}</span><span class="v">${c.m + c.s}</span></div>`).join('')}</div>
       <div class="legend" style="margin-top:10px"><span><i class="c-main"></i>${S.offline ? 'Semua kata cocok' : 'Topik utama'}</span><span><i class="c-side"></i>${S.offline ? 'Sebagian cocok' : 'Menyinggung'}</span></div>
     </div>
     <div>
@@ -899,7 +939,6 @@ function renderSearch(){
   const m = document.getElementById('srMore'); if (m) m.onclick = () => { srShowAll = !srShowAll; renderSearch(); };
 }
 
-document.getElementById('fmtKpw').addEventListener('change', e => { fmtKpw = e.target.value; renderFmt(); });
 
 /* ---------- Kampanye nasional ---------- */
 let campSel = null;
@@ -908,7 +947,7 @@ const fmtDT = iso => { const d = new Date(iso); return d.toLocaleDateString('id-
 function renderCamp(){
   const C = DATA.campaigns; const tbl = document.getElementById('camp');
   if (!C || !C.campaigns.length){ tbl.innerHTML = '<tr><td class="sub">Data kampanye belum tersedia.</td></tr>'; return; }
-  const ks = rows();
+  const ks = DATA.summary;
   // policy/release: lag of the KPw's first post vs the latest pusat post before it; campaigns/programs: number of posts
   const build = c => {
     const isRel = c.jenis === 'kebijakan';
@@ -927,22 +966,23 @@ function renderCamp(){
   const maxN = Math.max(1, ...camp.flatMap(r => r.cells.filter(Boolean).map(x => x.n)));
   const JEN = {kebijakan:'Kebijakan/rilis', kampanye_edukasi:'Kampanye edukasi', program_acara:'Program/acara'};
   const order = [...rel, ...camp];
-  const head = `<thead><tr><th>Pesan pusat</th>${ks.map(k => `<th><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">Ikut</th><th style="text-align:right">Ringkas</th></tr></thead>`;
+  const head = `<thead><tr><th>Pesan pusat</th>${ks.map(k => `<th class="${dimU(k.username) ? 'dim' : selU === k.username ? 'hl' : ''}"><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">Ikut</th><th style="text-align:right">Ringkas</th></tr></thead>`;
   const row = r => { const ri = order.indexOf(r); return `<tr><td class="tl" data-ci="${ri}">${esc(r.c.nama)}<small>${JEN[r.c.jenis] || ''} · ${r.c.pusat_posts.length} unggahan pusat, pertama ${fmtDT(r.c.pusat_first)}</small></td>${r.cells.map((x, i) => {
-      if (!x) return '<td class="c z">·</td>';
+      const dm = dimU(ks[i].username) ? ' dim' : '';
+      if (!x) return `<td class="c z${dm}">·</td>`;
       const sel = campSel && campSel.ci === ri && campSel.u === ks[i].username;
       let f, label, cls = '';
       if (r.isRel){
         if (x.lag === null){ cls = ' early'; label = 'Lebih awal'; f = 0; }
         else { f = Math.max(0, 1 - Math.min(x.lag, 7) / 7) * .9 + .1; label = 'H+' + x.lag; }
       } else { f = Math.min(1, x.n / maxN) * .9 + .1; label = x.n; }
-      return `<td class="c${cls}${sel ? ' sel' : ''}" data-ci="${ri}" data-u="${ks[i].username}" data-i="${i}" style="${cls ? 'font-size:.7rem' : `background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}`}">${label}${x.local ? '<span class="lk">•</span>' : ''}</td>`;
+      return `<td class="c${cls}${sel ? ' sel' : ''}${dm}" data-ci="${ri}" data-u="${ks[i].username}" data-i="${i}" style="${cls ? 'font-size:.7rem' : `background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}`}">${label}${x.local ? '<span class="lk">•</span>' : ''}</td>`;
     }).join('')}<td class="tot">${r.n}/${ks.length}</td><td class="tot">${r.isRel ? (r.med === null ? '–' : 'median H+' + r.med) : r.posts + ' unggahan'}</td></tr>`; };
   const grp = (t, sub) => `<tr><td colspan="${ks.length + 3}" style="padding:14px 8px 4px;font-family:var(--display);font-weight:600;color:var(--ink)">${t} <span style="font-family:var(--body);font-weight:400;color:var(--ink-3);font-size:.78rem">${sub}</span></td></tr>`;
   tbl.innerHTML = head + '<tbody>' +
     (rel.length ? grp('Kebijakan & rilis', 'angka = jeda hari dari unggahan pusat terakhir sebelum unggahan KPw · makin gelap makin cepat') + rel.map(row).join('') : '') +
     (camp.length ? grp('Kampanye & program', 'angka = jumlah unggahan KPw · makin gelap makin banyak') + camp.map(row).join('') : '') +
-    `<tr class="sum"><td style="text-align:left">Pesan yang diikuti</td>${ks.map((k, i) => `<td>${order.filter(r => r.cells[i]).length}/${order.length}</td>`).join('')}<td></td><td></td></tr></tbody>`;
+    `<tr class="sum"><td style="text-align:left">Pesan yang diikuti</td>${ks.map((k, i) => `<td class="${dimU(k.username) ? 'dim' : ''}">${order.filter(r => r.cells[i]).length}/${order.length}</td>`).join('')}<td></td><td></td></tr></tbody>`;
   document.getElementById('campSub').textContent = `${order.length} pesan nasional dari ${C.pusat_posts} unggahan @bank_indonesia, dicocokkan dengan unggahan ${ks.length} KPw`;
   const tt = tooltipEl();
   tbl.querySelectorAll('td.c[data-ci]').forEach(td => {
@@ -1000,10 +1040,10 @@ function renderVoice(){
   }).join('') : '<div class="sub">Belum ada isu berulang untuk filter ini.</div>';
 
   const order = ['pertanyaan','keluhan','saran_permintaan','apresiasi','partisipasi_kuis','spam_promosi','lainnya'];
-  const rowsV = ks.map(k => { const xs = items.filter(i => i.u === k.username); const c = {}; xs.forEach(i => c[i.k] = (c[i.k] || 0) + 1); const sub = xs.filter(i => !['partisipasi_kuis','spam_promosi','lainnya'].includes(i.k)); return {k, n: xs.length, c, qk: (c.pertanyaan || 0) + (c.keluhan || 0) + (c.saran_permintaan || 0), neg: sub.length ? sub.filter(i => i.s === 'negatif').length / sub.length : 0}; })
+  const rowsV = DATA.summary.map(k => { const xs = V.items.filter(i => i.u === k.username); const c = {}; xs.forEach(i => c[i.k] = (c[i.k] || 0) + 1); const sub = xs.filter(i => !['partisipasi_kuis','spam_promosi','lainnya'].includes(i.k)); return {k, n: xs.length, c, qk: (c.pertanyaan || 0) + (c.keluhan || 0) + (c.saran_permintaan || 0), neg: sub.length ? sub.filter(i => i.s === 'negatif').length / sub.length : 0}; })
     .sort((a,b) => b.qk - a.qk || b.n - a.n);
   document.getElementById('voiceTbl').innerHTML = `<thead><tr><th>KPw</th><th>Komentar</th><th style="text-align:left">Komposisi</th><th>Tanya/keluh</th><th>Negatif</th></tr></thead><tbody>` +
-    rowsV.map(r => `<tr><td><div class="kp"><i style="background:${provColor(r.k.provinsi)}"></i>${r.k.kpw}</div></td><td>${r.n}</td><td style="text-align:left"><div class="stack">${order.map(o => r.c[o] ? `<i class="${KAT[o][1]}" style="width:${r.c[o] / r.n * 100}%" title="${KAT[o][0]}: ${r.c[o]}"></i>` : '').join('')}</div></td><td><b>${r.qk}</b></td><td>${r.n ? Math.round(r.neg * 100) + '%' : '–'}</td></tr>`).join('') + '</tbody>';
+    rowsV.map(r => `<tr${dimU(r.k.username) ? ' class="dim"' : ''}><td><div class="kp"><i style="background:${provColor(r.k.provinsi)}"></i>${r.k.kpw}</div></td><td>${r.n}</td><td style="text-align:left"><div class="stack">${order.map(o => r.c[o] ? `<i class="${KAT[o][1]}" style="width:${r.c[o] / r.n * 100}%" title="${KAT[o][0]}: ${r.c[o]}"></i>` : '').join('')}</div></td><td><b>${r.qk}</b></td><td>${r.n ? Math.round(r.neg * 100) + '%' : '–'}</td></tr>`).join('') + '</tbody>';
   document.getElementById('voiceLegend').innerHTML = `<span><i class="k-q"></i>Pertanyaan</span><span><i class="k-c"></i>Keluhan</span><span><i class="k-s"></i>Saran/permintaan</span><span><i class="k-a"></i>Apresiasi</span><span><i class="k-o"></i>Kuis, spam, lainnya</span>`;
 
   const sel = document.getElementById('respKpw');
@@ -1022,7 +1062,7 @@ document.querySelectorAll('#heatMode button').forEach(b => b.addEventListener('c
 document.querySelectorAll('#heatScope button').forEach(b => b.addEventListener('click', () => {
   heatScope = b.dataset.v; document.querySelectorAll('#heatScope button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderHeat();
 }));
-{ const q0 = new URLSearchParams(location.search).get('q'); if (q0) doSearch(q0); }
+{ const sp = new URLSearchParams(location.search), k0 = sp.get('kpw'); if (k0 && DATA.summary.some(s => s.username === k0)) setKpw(k0); const q0 = sp.get('q'); if (q0) doSearch(q0); }
 
 document.addEventListener('scroll', () => { tooltipEl().style.display = 'none'; }, {passive:true});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
