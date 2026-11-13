@@ -18,13 +18,31 @@ WIB = timezone(timedelta(hours=7))
 FORMAT = {"clips": "Reels", "carousel_container": "Carousel", "feed": "Foto"}
 
 accounts = json.loads((ROOT / "data/accounts.json").read_text())
-SHORT = {"Provinsi Jawa Barat": "Prov. Jabar", "Provinsi Jawa Tengah": "Prov. Jateng"}
+SHORT = {"Provinsi Jawa Barat": "Prov. Jabar", "Provinsi Jawa Tengah": "Prov. Jateng", "Provinsi Jawa Timur": "Prov. Jatim",
+         "Provinsi DKI Jakarta": "Prov. DKI Jakarta", "Provinsi Banten": "Prov. Banten", "Provinsi DI Yogyakarta": "Prov. DIY"}
+PROVINCES = ["DKI Jakarta", "Banten", "Jawa Barat", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur"]
 for a in accounts:
     a["kpw_pendek"] = SHORT.get(a["kpw"], a["kpw_pendek"])
 sys.path.insert(0, str(ROOT / "scripts"))
 from taxonomy import TOPICS  # noqa: E402
 tpath = ROOT / "data/topics.json"
 TOPIC_DATA = json.loads(tpath.read_text()) if tpath.exists() else {}
+def load_opt(name):
+    f = ROOT / "data" / name
+    return json.loads(f.read_text()) if f.exists() else None
+
+
+def slim_comments(c):
+    """Keep every label for counting, but only ship text for comments worth reading."""
+    if not c:
+        return None
+    keep_text = {"pertanyaan", "keluhan", "saran_permintaan", "apresiasi"}
+    return {"total_comments_reported": c["total_comments_reported"], "issues": c["issues"],
+            "items": [{"id": i["id"], "post": i["post"], "u": i["username"], "k": i["kategori"], "s": i["sentimen"],
+                       "isu": i["isu"], "r": i["perlu_respons"], "likes": i["likes"],
+                       "t": i["text"][:240] if i["kategori"] in keep_text else ""} for i in c["items"]]}
+
+
 ipath = ROOT / "data/insights.json"
 INSIGHTS = json.loads(ipath.read_text()) if ipath.exists() else None
 posts_raw = json.loads((ROOT / "raw/posts.json").read_text())
@@ -65,6 +83,7 @@ for p in posts_raw:
         "provinsi": acc["provinsi"],
         "username": acc["username"],
         "date": ts.strftime("%Y-%m-%d"),
+        "ts": ts.isoformat(),
         "format": FORMAT.get(p.get("productType"), p.get("type")),
         "likes": likes,
         "comments": comments,
@@ -102,7 +121,8 @@ d = PERIOD_START.date()
 while d <= PERIOD_END.date():
     days.append(d.strftime("%Y-%m-%d"))
     d += timedelta(days=1)
-daily = {prov: collections.Counter() for prov in ("Jawa Barat", "Jawa Tengah")}
+PROVINCES = [x for x in PROVINCES if any(a["provinsi"] == x for a in accounts)]
+daily = {prov: collections.Counter() for prov in PROVINCES}
 for p in posts:
     daily[p["provinsi"]][p["date"]] += p["engagement"]
 
@@ -119,7 +139,10 @@ out = {
     "daily": {"days": days, **{k: [v[x] for x in days] for k, v in daily.items()}},
     "formats": [{"format": k, **v, "eng_per_post": round(v["engagement"] / v["posts"], 1)} for k, v in fmt.items()],
     "posts": sorted(posts, key=lambda p: -p["engagement"]),
+    "provinces": PROVINCES,
     "topics": [{"id": t["id"], "label": t["label"], "desc": t["desc"]} for t in TOPICS],
+    "comments": slim_comments(load_opt("comments.json")),
+    "campaigns": load_opt("campaigns.json"),
     "insights": INSIGHTS,
 }
 (ROOT / "data/dashboard.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))

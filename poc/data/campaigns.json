@@ -1,0 +1,1716 @@
+{
+ "pusat": {
+  "kpw": "Bank Indonesia (pusat)",
+  "username": "bank_indonesia",
+  "url": "https://www.instagram.com/bank_indonesia/"
+ },
+ "pusat_posts": 57,
+ "campaigns": [
+  {
+   "id": "rdg-oktober-2026",
+   "nama": "Keputusan RDG BI Oktober 2026",
+   "ringkas": "Bank Indonesia mempertahankan BI-Rate di level 5,75% untuk menjaga stabilitas Rupiah dan inflasi sambil terus mendorong pertumbuhan ekonomi.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DeZIJFHgSAs",
+    "Dev0v_amXrP",
+    "DewoNf9BF4s",
+    "De0XU9oGCYD",
+    "De1TAOANrNh",
+    "DfGv7zpGQ5N"
+   ],
+   "pusat_first": "2026-10-12T18:28:41+07:00",
+   "pusat_posts": [
+    {
+     "id": "DeZIJFHgSAs",
+     "url": "https://www.instagram.com/p/DeZIJFHgSAs/",
+     "ts": "2026-10-12T18:28:41+07:00",
+     "likes": 1062,
+     "comments": 108
+    },
+    {
+     "id": "Dev0v_amXrP",
+     "url": "https://www.instagram.com/p/Dev0v_amXrP/",
+     "ts": "2026-10-21T14:01:46+07:00",
+     "likes": 2280,
+     "comments": 72
+    },
+    {
+     "id": "DewoNf9BF4s",
+     "url": "https://www.instagram.com/p/DewoNf9BF4s/",
+     "ts": "2026-10-21T21:33:43+07:00",
+     "likes": 1063,
+     "comments": 94
+    },
+    {
+     "id": "De0XU9oGCYD",
+     "url": "https://www.instagram.com/p/De0XU9oGCYD/",
+     "ts": "2026-10-23T08:20:52+07:00",
+     "likes": 1854,
+     "comments": 96
+    },
+    {
+     "id": "De1TAOANrNh",
+     "url": "https://www.instagram.com/p/De1TAOANrNh/",
+     "ts": "2026-10-23T17:04:51+07:00",
+     "likes": 1052,
+     "comments": 98
+    },
+    {
+     "id": "DfGv7zpGQ5N",
+     "url": "https://www.instagram.com/p/DfGv7zpGQ5N/",
+     "ts": "2026-10-30T11:42:13+07:00",
+     "likes": 1721,
+     "comments": 119
+    }
+   ],
+   "contoh": "Berjalan beriringan, stabilitas dijaga dan pertumbuhan terus didorong! #SobatRupiah, dinamika global masih berlanjut, mulai dari kondisi di Timur Tengah hingga arah suku bunga AS di kisaran 3,75-4,00%. Di samping itu, ha",
+   "kpw_posts": [
+    {
+     "id": "DfJKg2-E_Id",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dex6GtgTowj",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev8MkYEyCI",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De1TG6Bkxbg",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev2RebkjD-",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dev8k_bn27K",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DedZkKgk0KD",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev9eOPmh84",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De09rTak3js",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfHDe_oE9dg",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dex5Mwlz9T0",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev9G9SD9ny",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev-3qUINy1",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De1VCMqj75a",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De0afHtAdzR",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DewtF22PEdW",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeyxcuZmRjM",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dew1NSuk7JW",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev7S7VoOKb",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev5i8KsGRx",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De6dOauk1F7",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DewDfeBEnd8",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De0weH4zJ5z",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev5OfDk7fn",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfG02jvFM8g",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev15BvlJK1",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De1mUUgFO5Y",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeyLeSMKt40",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De-ybeoTiRr",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "isef-2026",
+   "nama": "Indonesia Sharia Economic Festival 2026",
+   "ringkas": "Bank Indonesia menggelar ISEF 2026 untuk memperkuat posisi Indonesia sebagai pusat ekonomi dan keuangan syariah dunia.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "Ded-Kb0hl_N",
+    "DeeUFCBuzZt",
+    "DefpSUnhEQQ",
+    "Deg8bGVhlgV",
+    "DeiVfEsBJKi",
+    "DeiX0U4OGjq",
+    "DelLEtjmT_c",
+    "DenpyzSMrfv",
+    "DeqtkgPBkdF"
+   ],
+   "pusat_first": "2026-10-14T15:40:57+07:00",
+   "pusat_posts": [
+    {
+     "id": "Ded-Kb0hl_N",
+     "url": "https://www.instagram.com/p/Ded-Kb0hl_N/",
+     "ts": "2026-10-14T15:40:57+07:00",
+     "likes": 1022,
+     "comments": 90
+    },
+    {
+     "id": "DeeUFCBuzZt",
+     "url": "https://www.instagram.com/p/DeeUFCBuzZt/",
+     "ts": "2026-10-14T18:50:38+07:00",
+     "likes": 1425,
+     "comments": 81
+    },
+    {
+     "id": "DefpSUnhEQQ",
+     "url": "https://www.instagram.com/p/DefpSUnhEQQ/",
+     "ts": "2026-10-15T07:15:04+07:00",
+     "likes": 710,
+     "comments": 85
+    },
+    {
+     "id": "Deg8bGVhlgV",
+     "url": "https://www.instagram.com/p/Deg8bGVhlgV/",
+     "ts": "2026-10-15T19:22:46+07:00",
+     "likes": 508,
+     "comments": 79
+    },
+    {
+     "id": "DeiVfEsBJKi",
+     "url": "https://www.instagram.com/p/DeiVfEsBJKi/",
+     "ts": "2026-10-16T08:19:31+07:00",
+     "likes": 2385,
+     "comments": 162
+    },
+    {
+     "id": "DeiX0U4OGjq",
+     "url": "https://www.instagram.com/p/DeiX0U4OGjq/",
+     "ts": "2026-10-16T08:41:58+07:00",
+     "likes": 482,
+     "comments": 92
+    },
+    {
+     "id": "DelLEtjmT_c",
+     "url": "https://www.instagram.com/p/DelLEtjmT_c/",
+     "ts": "2026-10-17T10:45:11+07:00",
+     "likes": 1067,
+     "comments": 93
+    },
+    {
+     "id": "DenpyzSMrfv",
+     "url": "https://www.instagram.com/p/DenpyzSMrfv/",
+     "ts": "2026-10-18T09:54:30+07:00",
+     "likes": 728,
+     "comments": 99
+    },
+    {
+     "id": "DeqtkgPBkdF",
+     "url": "https://www.instagram.com/p/DeqtkgPBkdF/",
+     "ts": "2026-10-19T14:24:29+07:00",
+     "likes": 624,
+     "comments": 95
+    }
+   ],
+   "contoh": "“ISEF hadir bukan sekadar sebagai festival, tetapi sebagai etalase capaian sekaligus mesin penggerak untuk mewujudkan Indonesia sebagai pusat ekonomi dan keuangan syariah dunia!” Demikian yang disampaikan Gubernur BI, De",
+   "kpw_posts": [
+    {
+     "id": "Deirtk6k0v_",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DelGBX4zidg",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeduB_aoHqX",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DebNUXVz_oG",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DegcgxwztAT",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DegA9xdPoBu",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeRN-3MFJj",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegopKwvBEq",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DetCBXMj63-",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deao5mTvNjc",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeZZRVak0uA",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DedWrNaz08K",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Degu8-CE_1J",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeozuHXk-Tm",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DebRHmpzuGJ",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Def5Bwmzpvv",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Degh_vKz5Co",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DetB8Ckkw9t",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Delx7ixzK0F",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dek3nvOKw4f",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Defv_WUzlCq",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeiWjqbTwOd",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeqRXONzLpM",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Debq8dUMZBV",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dea3SxwExNy",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DejIx1qyaRu",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dewp9a0kl8q",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegVDVLzxyk",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Degf0ZdAokV",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dei0MOIgRVa",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deik9G-qr9_",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dearp_BS_Hx",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DevxBRfoPu8",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeixFKkyIJs",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dec9Ss8Sxqq",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Def-dlLILi9",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeqWoozoIS4",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeejvVDASt-",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dej3UuQjwhK",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dealz2qSk5b",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Def49xcK4wJ",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeebsHhEiQy",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DebOQfczysg",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DebD_aAqkRz",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DefmA3uSXse",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DetcT1ly9bx",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeijkH7gz1w",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DerObyAkh_c",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De3OVvck-WH",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DebD_ejmvSd",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deta2LYP9tA",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeakOtMhhDa",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeZSUHDAf66",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DedJ-C2krCE",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deg6is0IQyq",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dev0UdCTTUL",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeqSCzSb8v",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Del67PDydDK",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejOcjSzSaT",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DecPubPE6Em",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Def5czlS6YV",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dea5M2DSerr",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeaoesrnzY1",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeZBenJhP0h",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DednbdroyK9",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DehWGiYIo_a",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DefzBWFM7A1",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Delekxih8t9",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DedVUlkFAy2",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deq2SrDT9NS",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeflAw_Bc_l",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DflrPCrSAnS",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejKDrmTqU2",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeXFfYPl9O",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DegnWaDPxEg",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DebR611zAwj",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DejfW-zM9qD",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Def1Aj7P3c4",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Det593Ngb00",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DefzFMjsLld",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DelIGhoy0I6",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deg_r2IzzDl",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegADvfGYIN",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dekwo08BAT0",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeihaEfzbBd",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegraGBgkUB",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeiajhEs-3F",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Demhp7Po3Ob",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegoWlShfX1",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Defl-2qy-PM",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DerA79CSTzW",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeAm5Hkz9q",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Deokl1lBLu4",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeiFvdQT8kO",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejFmskv1bS",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejTQIZIVw2",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejoN3OIJUL",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegUj9DT4IE",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deo0JsDB_vX",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deid2yJytw5",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeqL5YIHdl",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DejARdGxPrY",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dek4FggygM_",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegDUPLhdJ9",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeflwAEy7Ab",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DehE9D7hGdh",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeyWQQbN5TY",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeeurdngVR_",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dejbe3HBZsw",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegY_ONBIZg",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegCubThNOV",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeqkvJmT8Lp",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeqlWirzyY3",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Deb516zTt4X",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeoIzlXzXNS",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Des6pd_qTQV",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeeEeHHznM7",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DegwtUezcQE",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Def9cBpTsoC",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DewLs5dKocm",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dei3oN2z_Nr",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeddRYtE72u",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeYNTHVTvLy",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "qris-antarnegara",
+   "nama": "Perluasan Layanan QRIS Antarnegara",
+   "ringkas": "Bank Indonesia terus memperluas kerja sama penggunaan QRIS Antarnegara untuk kemudahan transaksi internasional masyarakat.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DfJWjNsBwl0",
+    "DfbPEBchAbF",
+    "DfbZphcGaNX",
+    "DfcKWhUmfLp"
+   ],
+   "pusat_first": "2026-10-31T12:01:59+07:00",
+   "pusat_posts": [
+    {
+     "id": "DfJWjNsBwl0",
+     "url": "https://www.instagram.com/p/DfJWjNsBwl0/",
+     "ts": "2026-10-31T12:01:59+07:00",
+     "likes": 936,
+     "comments": 90
+    },
+    {
+     "id": "DfbPEBchAbF",
+     "url": "https://www.instagram.com/p/DfbPEBchAbF/",
+     "ts": "2026-11-07T10:41:02+07:00",
+     "likes": 480,
+     "comments": 23
+    },
+    {
+     "id": "DfbZphcGaNX",
+     "url": "https://www.instagram.com/p/DfbZphcGaNX/",
+     "ts": "2026-11-07T12:11:32+07:00",
+     "likes": 2035,
+     "comments": 40
+    },
+    {
+     "id": "DfcKWhUmfLp",
+     "url": "https://www.instagram.com/p/DfcKWhUmfLp/",
+     "ts": "2026-11-07T19:17:06+07:00",
+     "likes": 1994,
+     "comments": 803
+    }
+   ],
+   "contoh": "Jalan-jalan ke Tailan semakin seru kalau kulinernya dapet, jalannya dapet, dan belanjanya… nggak bikin ribet! 🥳 Sekarang, berburu street food sampai belanja di Tailan serba gampang karena #SobatRupiah sudah bisa mengguna",
+   "kpw_posts": [
+    {
+     "id": "DfHnsizoysI",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeYKiDfzaL3",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfOJTNvzngF",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfB49NzILFx",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De8zGDDKMDx",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeYDSJ7zTs9",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dedik3PsaUx",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfOIQqJT3ce",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfjdxyFzY-I",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "waspada-penipuan-hoaks",
+   "nama": "Waspada Penipuan Mencatut Nama BI",
+   "ringkas": "Masyarakat diimbau waspada terhadap modus penipuan dan hoaks yang mencatut nama serta logo Bank Indonesia.",
+   "jenis": "kampanye_edukasi",
+   "pusat_ids": [
+    "DevuZfShCHu",
+    "DfBzk0xOIp_",
+    "DfT_LwDBi-x",
+    "DflW__JNTma"
+   ],
+   "pusat_first": "2026-10-21T13:10:08+07:00",
+   "pusat_posts": [
+    {
+     "id": "DevuZfShCHu",
+     "url": "https://www.instagram.com/p/DevuZfShCHu/",
+     "ts": "2026-10-21T13:10:08+07:00",
+     "likes": 693,
+     "comments": 99
+    },
+    {
+     "id": "DfBzk0xOIp_",
+     "url": "https://www.instagram.com/p/DfBzk0xOIp_/",
+     "ts": "2026-10-28T13:39:39+07:00",
+     "likes": 473,
+     "comments": 88
+    },
+    {
+     "id": "DfT_LwDBi-x",
+     "url": "https://www.instagram.com/p/DfT_LwDBi-x/",
+     "ts": "2026-11-04T15:07:57+07:00",
+     "likes": 516,
+     "comments": 43
+    },
+    {
+     "id": "DflW__JNTma",
+     "url": "https://www.instagram.com/p/DflW__JNTma/",
+     "ts": "2026-11-11T09:00:05+07:00",
+     "likes": 351,
+     "comments": 30
+    }
+   ],
+   "contoh": "🚨WASPADA HOAKS!🚨 Beredar surat yang mengatasnamakan “Proyek Garuda” dan mengatasnamakan Bank Indonesia, berisi klaim dana dari Bank for International Settlements (BIS) dengan jaminan aset emas. Jangan mudah percaya, #Sob",
+   "kpw_posts": [
+    {
+     "id": "DezO5x5TE54",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfGY2KLBP85",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeyiiODznGO",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DewFuSUBdjt",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeysmxxIDj3",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DewD9VKP2ll",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfmSDS5BBQN",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfn9na5yMwR",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfloNmkM-Mn",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeykvIrgX0E",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfe1R5eBavK",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dey_ZNJT1nO",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De1SBxAyqlV",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dex-nSkt9S1",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dev0r6lqV8g",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Deq0sEQKtsL",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "gpips-inflasi-pangan",
+   "nama": "Gerakan Pengendalian Inflasi Pangan Sejahtera",
+   "ringkas": "Bank Indonesia memperkuat sinergi GPIPS untuk mengantisipasi risiko cuaca ekstrem El Nino dan menjaga keterjangkauan harga pangan.",
+   "jenis": "kampanye_edukasi",
+   "pusat_ids": [
+    "De1cKcijxQu",
+    "De9XZHCmTs7",
+    "DfXGAwDBdt2",
+    "DfjpNgWGb5R"
+   ],
+   "pusat_first": "2026-10-23T18:22:22+07:00",
+   "pusat_posts": [
+    {
+     "id": "De1cKcijxQu",
+     "url": "https://www.instagram.com/p/De1cKcijxQu/",
+     "ts": "2026-10-23T18:22:22+07:00",
+     "likes": 803,
+     "comments": 101
+    },
+    {
+     "id": "De9XZHCmTs7",
+     "url": "https://www.instagram.com/p/De9XZHCmTs7/",
+     "ts": "2026-10-26T20:14:36+07:00",
+     "likes": 743,
+     "comments": 77
+    },
+    {
+     "id": "DfXGAwDBdt2",
+     "url": "https://www.instagram.com/p/DfXGAwDBdt2/",
+     "ts": "2026-11-05T20:11:47+07:00",
+     "likes": 810,
+     "comments": 37
+    },
+    {
+     "id": "DfjpNgWGb5R",
+     "url": "https://www.instagram.com/p/DfjpNgWGb5R/",
+     "ts": "2026-11-10T17:01:26+07:00",
+     "likes": 879,
+     "comments": 23
+    }
+   ],
+   "contoh": "“Saya memiliki keyakinan, Tallukarsa Pangan Sulampua dapat menjadi kunci dalam menjaga inflasi pangan di Sulampua!” Demikian disampaikan Deputi Gubernur BI Thomas Djiwandono dalam sambutannya saat membuka Gerakan Pengend",
+   "kpw_posts": [
+    {
+     "id": "DfWJZVnBNW7",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De_WPq2kwZF",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DflW78PJLSF",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfoJOW2k7PJ",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfUO7h-zA29",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfTbU6BzPv6",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deq5GJ8IHvF",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfby3MKzMdL",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfPHDCTEmBF",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfUWv-khTRN",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De8S1jqztnQ",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De0oIWjoHov",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De5z1anIPvj",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De3TxgghOPI",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfEa8d2Ei7K",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dflcqiekz2J",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfa4aSgz_pu",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfYNOppSnjX",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De-5vLPlJ3B",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfi7y0Ozr2Y",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "perlindungan-konsumen-peka",
+   "nama": "Edukasi Perlindungan Konsumen Bertransaksi PEKA",
+   "ringkas": "Bank Indonesia mengedukasi masyarakat untuk selalu Peduli, Kenali, dan Adukan (PEKA) dalam bertransaksi keuangan.",
+   "jenis": "kampanye_edukasi",
+   "pusat_ids": [
+    "De9pJuNgLSA",
+    "DfJraQatZPT"
+   ],
+   "pusat_first": "2026-10-26T22:53:30+07:00",
+   "pusat_posts": [
+    {
+     "id": "De9pJuNgLSA",
+     "url": "https://www.instagram.com/p/De9pJuNgLSA/",
+     "ts": "2026-10-26T22:53:30+07:00",
+     "likes": 975,
+     "comments": 98
+    },
+    {
+     "id": "DfJraQatZPT",
+     "url": "https://www.instagram.com/p/DfJraQatZPT/",
+     "ts": "2026-10-31T15:00:06+07:00",
+     "likes": 873,
+     "comments": 81
+    }
+   ],
+   "contoh": "Super Peka beraksi! 🦸 Saatnya jadi pahlawan menolong warga bumi menghadapi penjahat siber! ⚠️ Bersama timnya, Super Peka hadir untuk membantu semua orang lewat kanal pengaduan \"adukan\". Awalnya misi ini terlihat mudah, t",
+   "kpw_posts": [
+    {
+     "id": "DfQ4XGFExd5",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfRZuQjk0BQ",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeloitBA7zm",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De_pa4Xhtq6",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DerKagSznD4",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfGVy_tz8hw",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfFQA3pT5im",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DetBfuJA8f0",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De_jWI8Anv1",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfGc2lpEw-w",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dey67tsIW-O",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DforA4tTC69",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Den4hf7TkpC",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Deyg0t-oIDU",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfOKbnKyT8z",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfok78ZgLWG",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfRhJ3rT2dD",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeashhhgafF",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfjpD04NnCe",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfgwgNPIsFW",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfom9mMT8Wj",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfHE2MfA8d3",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfdpl2vBx_P",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeyjZcNkk8H",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfok989AcP8",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfok9aoB15C",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Ded5YbKNlhq",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfok8ydtic0",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De_Z0z0gTwl",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DflMq8DNlCW",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De0Zv-BgWKI",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfghpAoKF2u",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfojyTcJ7vc",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfolQQSsday",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfl_4TgAuuE",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfdbyP8SSx7",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dfojo1Rgjxv",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DflU46pAWD-",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfmDx-XsaEP",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Dfopl1lgp6t",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfkLYdhh64a",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfonbaVzsgc",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfWMhg6k9zG",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfOOpOSEyuo",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DflvRPcz_2d",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "insentif-dndf-vastra",
+   "nama": "Instrumen Hedging DNDF dan VASTRA",
+   "ringkas": "Bank Indonesia mengoptimalkan fasilitas lindung nilai DNDF dan VASTRA untuk memperkuat stabilitas nilai tukar Rupiah.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DfBelRRutC0"
+   ],
+   "pusat_first": "2026-10-28T10:36:14+07:00",
+   "pusat_posts": [
+    {
+     "id": "DfBelRRutC0",
+     "url": "https://www.instagram.com/p/DfBelRRutC0/",
+     "ts": "2026-10-28T10:36:14+07:00",
+     "likes": 752,
+     "comments": 103
+    }
+   ],
+   "contoh": "VASTRA, fasilitas lindung nilai bagi investor global! #SobatRupiah, untuk memperkuat stabilitas nilai tukar Rupiah Bank Indonesia terus mengatur langkah strategis yang targeted dalam menarik modal asing (capital inflow) ",
+   "kpw_posts": [
+    {
+     "id": "De8GYLjTTmF",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfEJFLKzwLo",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfRCYpRp_hm",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De37EzMhP-c",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De8JXd0T2AU",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfD8_IGzCub",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfEEWRZgC0E",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "penurunan-gwm-perbankan",
+   "nama": "Pelonggaran Likuiditas Melalui Penurunan GWM",
+   "ringkas": "Bank Indonesia menurunkan Giro Wajib Minimum (GWM) perbankan untuk memperkuat kecukupan likuiditas dan mendorong penyaluran kredit.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DebjvY9vbzK",
+    "DfSDUtHhesV"
+   ],
+   "pusat_first": "2026-10-13T17:09:43+07:00",
+   "pusat_posts": [
+    {
+     "id": "DebjvY9vbzK",
+     "url": "https://www.instagram.com/p/DebjvY9vbzK/",
+     "ts": "2026-10-13T17:09:43+07:00",
+     "likes": 773,
+     "comments": 84
+    },
+    {
+     "id": "DfSDUtHhesV",
+     "url": "https://www.instagram.com/p/DfSDUtHhesV/",
+     "ts": "2026-11-03T21:07:06+07:00",
+     "likes": 1727,
+     "comments": 47
+    }
+   ],
+   "contoh": "🤔 Permintaan kredit kuat, tapi bank masih banyak pegang SRBI dan SBN. Apakah artinya bank enggan kasih kredit? Belum tentu, Sobat! Surat berharga dapat menjadi bagian dari pengelolaan likuiditas serta aset dan liabilitas",
+   "kpw_posts": [
+    {
+     "id": "DfYe-a-Trxq",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Ded_5zwzeEt",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfYckiZz2Ef",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "kemandirian-ekonomi-pesantren",
+   "nama": "Program Kemandirian Ekonomi Pesantren BI",
+   "ringkas": "Bank Indonesia mendampingi pesantren dalam mengembangkan usaha pertanian dan unit ekonomi untuk mendukung kemandirian.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "DeuE1-oBhxs",
+    "DfO2-d7AYJ1"
+   ],
+   "pusat_first": "2026-10-20T21:46:59+07:00",
+   "pusat_posts": [
+    {
+     "id": "DeuE1-oBhxs",
+     "url": "https://www.instagram.com/p/DeuE1-oBhxs/",
+     "ts": "2026-10-20T21:46:59+07:00",
+     "likes": 584,
+     "comments": 85
+    },
+    {
+     "id": "DfO2-d7AYJ1",
+     "url": "https://www.instagram.com/p/DfO2-d7AYJ1/",
+     "ts": "2026-11-02T15:19:21+07:00",
+     "likes": 426,
+     "comments": 38
+    }
+   ],
+   "contoh": "#SobatRupiah, santri juga bisa ikut menggerakkan pertanian kita lho 💪🌱 Di Pondok Pesantren Pertanian Darul Fallah di Bogor, santri bukan sekadar belajar agama, tapi juga harus bisa berdaya dan mandiri, salah satunya lewa",
+   "kpw_posts": [
+    {
+     "id": "DerK4uWkxzP",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dej-zQcTxNi",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfEoEy0k7MQ",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "promosi-umkm-ekspor",
+   "nama": "Promosi Kopi dan UMKM Go Global",
+   "ringkas": "Bank Indonesia mendukung UMKM binaan mendunia melalui pameran internasional seperti MIHAS dan SCAJ di Jepang.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "DebcLHlhBP0",
+    "Def4dVyhJLp",
+    "De3KYpRhQi6",
+    "DfjSgJSBOEW"
+   ],
+   "pusat_first": "2026-10-13T16:04:31+07:00",
+   "pusat_posts": [
+    {
+     "id": "DebcLHlhBP0",
+     "url": "https://www.instagram.com/p/DebcLHlhBP0/",
+     "ts": "2026-10-13T16:04:31+07:00",
+     "likes": 456,
+     "comments": 89
+    },
+    {
+     "id": "Def4dVyhJLp",
+     "url": "https://www.instagram.com/p/Def4dVyhJLp/",
+     "ts": "2026-10-15T09:29:04+07:00",
+     "likes": 1041,
+     "comments": 98
+    },
+    {
+     "id": "De3KYpRhQi6",
+     "url": "https://www.instagram.com/p/De3KYpRhQi6/",
+     "ts": "2026-10-24T10:31:01+07:00",
+     "likes": 3434,
+     "comments": 108
+    },
+    {
+     "id": "DfjSgJSBOEW",
+     "url": "https://www.instagram.com/p/DfjSgJSBOEW/",
+     "ts": "2026-11-10T13:59:10+07:00",
+     "likes": 360,
+     "comments": 22
+    }
+   ],
+   "contoh": "Produk lokal, peluang global! 🌏🇮🇩 Langkah nyata Bank Indonesia membawa UMKM Syariah menembus pasar dunia lewat pameran halal terbesar, MIHAS 2026 di Kuala Lumpur. Ini bukti kualitas produk halal Nusantara siap bersaing d",
+   "kpw_posts": [
+    {
+     "id": "DevE3GYqvE7",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dead2uBH0tY",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deb3oWdgTTd",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "De__7EVk91J",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DegoRVygMnz",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfUMWR2Bx21",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfmTySIoKdC",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "pengembangan-wisata-ramah-muslim",
+   "nama": "Pengembangan Ekosistem Wisata Ramah Muslim",
+   "ringkas": "Bank Indonesia berikhtiar membangun ekosistem pariwisata ramah Muslim secara terintegrasi untuk mendorong pertumbuhan ekonomi.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "Dejtx08hUsM"
+   ],
+   "pusat_first": "2026-10-16T21:11:03+07:00",
+   "pusat_posts": [
+    {
+     "id": "Dejtx08hUsM",
+     "url": "https://www.instagram.com/p/Dejtx08hUsM/",
+     "ts": "2026-10-16T21:11:03+07:00",
+     "likes": 558,
+     "comments": 91
+    }
+   ],
+   "contoh": "#PariwisataRamahMuslim: Dari Pesona Alam Menjadi Dampak Ekonomi Nyata! 🇮🇩✨ #SobatRupiah, Indonesia memiliki potensi besar untuk menjadi pusat pariwisata ramah Muslim dunia. Namun, destinasi yang menarik saja belum cukup.",
+   "kpw_posts": [
+    {
+     "id": "Del2I6-EtWn",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deddsn8EiaS",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DeqzqaWzLyM",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Degf_CfT8qB",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Dej-mp9zK6Y",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfmDv1OF_jz",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "peluncuran-website-bi",
+   "nama": "Peluncuran Tampilan Baru Website BI",
+   "ringkas": "Bank Indonesia memperbarui tampilan situs resminya untuk memudahkan publik mengakses informasi perekonomian dan kebijakan.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "DelIXNUM9TT"
+   ],
+   "pusat_first": "2026-10-17T10:23:24+07:00",
+   "pusat_posts": [
+    {
+     "id": "DelIXNUM9TT",
+     "url": "https://www.instagram.com/p/DelIXNUM9TT/",
+     "ts": "2026-10-17T10:23:24+07:00",
+     "likes": 942,
+     "comments": 97
+    }
+   ],
+   "contoh": "Ada yang baru dari Website Bank Indonesia! 👀✨ Kini, Website Bank Indonesia hadir dengan tampilan baru yang memudahkan Sobat Rupiah mencari berbagai informasi seputar Bank Indonesia dan perekonomian Indonesia. Mulai dari ",
+   "kpw_posts": [
+    {
+     "id": "DeqISVYT4SE",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "De5ehHOSWO6",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "Des3c-PT-wd",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DeqLB3SRqpA",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "perkembangan-ihk-inflasi",
+   "nama": "Perkembangan Inflasi Indeks Harga Konsumen",
+   "ringkas": "Bank Indonesia menginformasikan inflasi Oktober 2026 yang tetap terjaga dalam kisaran sasaran 2,5±1%.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DfR25Pome-8"
+   ],
+   "pusat_first": "2026-11-03T19:14:41+07:00",
+   "pusat_posts": [
+    {
+     "id": "DfR25Pome-8",
+     "url": "https://www.instagram.com/p/DfR25Pome-8/",
+     "ts": "2026-11-03T19:14:41+07:00",
+     "likes": 693,
+     "comments": 40
+    }
+   ],
+   "contoh": "#SobatRupiah, pada Oktober 2026 Indeks Harga Konsumen (IHK) tercatat mengalami inflasi sebesar 0,22% (mtm), sehingga secara tahunan inflasi berada di level 3,23% (yoy) dan tetap terkendali dalam kisaran sasaran 2,5±1%. C",
+   "kpw_posts": [
+    {
+     "id": "DfROKTskw15",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfPWlAnkzGw",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "Deb4obQgRiR",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfV9b7iH3Ml",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfUQD3OG7Tv",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DflrmD6D1h0",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfUkx0zs2ns",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfZHSbeIAy6",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfRFJxBGeRs",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfTrunQkhSM",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfQ4lQjBrBR",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfUFDSwEwbh",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  },
+  {
+   "id": "rapat-berkala-kssk",
+   "nama": "Rapat Berkala KSSK IV 2026",
+   "ringkas": "KSSK terus memperkuat koordinasi sinergis untuk menjaga stabilitas sistem keuangan di tengah tekanan geopolitik global.",
+   "jenis": "program_acara",
+   "pusat_ids": [
+    "DfVxI7emZWm"
+   ],
+   "pusat_first": "2026-11-05T07:41:21+07:00",
+   "pusat_posts": [
+    {
+     "id": "DfVxI7emZWm",
+     "url": "https://www.instagram.com/p/DfVxI7emZWm/",
+     "ts": "2026-11-05T07:41:21+07:00",
+     "likes": 1026,
+     "comments": 44
+    }
+   ],
+   "contoh": "📊 Rapat Berkala KSSK IV 2026: Stabilitas Sistem Keuangan Tetap Terjaga! 🇮🇩 #SobatRupiah, memasuki Oktober 2026 tekanan kembali meningkat, mulai dari eskalasi konflik geopolitik yang mendorong harga energi global 🌏, kebij",
+   "kpw_posts": [
+    {
+     "id": "Dfm48n2EsXt",
+     "jenis": "materi_sama"
+    },
+    {
+     "id": "DfZNA8jkz-W",
+     "jenis": "materi_sama"
+    }
+   ]
+  },
+  {
+   "id": "pertumbuhan-ekonomi-tw3",
+   "nama": "Kinerja Pertumbuhan Ekonomi Triwulan III",
+   "ringkas": "Ekonomi Indonesia Triwulan III 2026 mencatatkan pertumbuhan positif sebesar 5,47% yang ditopang oleh konsumsi dan investasi.",
+   "jenis": "kebijakan",
+   "pusat_ids": [
+    "DfZd5XkGQku"
+   ],
+   "pusat_first": "2026-11-06T18:10:10+07:00",
+   "pusat_posts": [
+    {
+     "id": "DfZd5XkGQku",
+     "url": "https://www.instagram.com/p/DfZd5XkGQku/",
+     "ts": "2026-11-06T18:10:10+07:00",
+     "likes": 857,
+     "comments": 47
+    }
+   ],
+   "contoh": "📈 Ekonomi Indonesia Terus Tumbuh di Tengah Dinamika Global. Apa Penopangnya? #SobatRupiah, ekonomi Indonesia pada Triwulan III 2026 tumbuh 5,47% (yoy), meningkat dari 5,29% (yoy) pada triwulan sebelumnya. 💪 Pertumbuhan i",
+   "kpw_posts": [
+    {
+     "id": "DetfNUKEtTV",
+     "jenis": "kegiatan_lokal"
+    },
+    {
+     "id": "DfW-2bZE8Wr",
+     "jenis": "kegiatan_lokal"
+    }
+   ]
+  }
+ ]
+}

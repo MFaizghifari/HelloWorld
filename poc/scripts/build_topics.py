@@ -182,12 +182,12 @@ def insights(posts, topics):
             tot_n[t] += 1
             tot_e[t] += eng[p["id"]]
     totals = "; ".join(f"{label[t]}: {n} post, {tot_e[t]} engagement ({round(tot_e[t] / n)} per post)" for t, n in tot_n.most_common())
-    prompt = ("Berikut rekap topik unggahan Instagram 7 KPw Bank Indonesia (Jawa Barat & Jawa Tengah), 12 Okt-12 Nov 2026. "
+    prompt = (f"Berikut rekap topik unggahan Instagram {len(lines)} KPw Bank Indonesia di Pulau Jawa, 12 Okt-12 Nov 2026. "
               "Engagement = likes + komentar. Semua angka berdasarkan topik utama tiap post.\n\n"
               f"TOTAL SEMUA KPw (pakai angka ini apa adanya, jangan menjumlah ulang): {totals}\n\n" + "\n\n".join(lines) +
               "\n\nSebut kantor sebagai 'KPw <nama>' (bukan kantor cabang)." +
               "\n\nTulis dalam Bahasa Indonesia yang lugas, tanpa kata berlebihan, tanpa tanda pisah panjang:\n"
-              "- umum: 3 temuan lintas KPw (masing-masing 1 kalimat, sebut angka), misalnya topik yang paling sering vs paling tinggi engagement-nya, "
+              "- umum: 4 temuan lintas KPw (masing-masing 1 kalimat, sebut angka), misalnya topik yang paling sering vs paling tinggi engagement-nya, "
               "dan KPw mana yang paling banyak mengangkat isu lokal.\n"
               "- kpw: untuk setiap akun, narasi 2 kalimat: fokus topik utamanya (dengan jumlah post) dan satu ciri khas/contoh program.")
     res, _ = generate_json(prompt, INSIGHT_SCHEMA, 8000)

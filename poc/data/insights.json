@@ -1,37 +1,66 @@
 {
  "umum": [
-  "Topik ekonomi dan keuangan syariah menjadi yang paling sering diunggah dengan total 68 post, namun sistem pembayaran dan QRIS mencatatkan engagement tertinggi mencapai 22.445 engagement.",
-  "Rata-rata engagement tertinggi diraih oleh topik sistem pembayaran dan QRIS yang mencapai 510 engagement per post.",
-  "KPw Purwokerto menjadi kantor perwakilan yang paling banyak mengangkat isu lokal dengan jumlah 44 konten lokal dari total 60 post."
+  "Secara keseluruhan, Ekonomi & keuangan syariah menjadi topik paling sering diunggah dengan total 123 post, namun Edukasi & GenBI mendulang rata-rata engagement tertinggi yaitu 397 per post.",
+  "Sistem pembayaran & QRIS mencatatkan total engagement tertinggi yakni 34.377 engagement dari 97 post.",
+  "KPw Malang menjadi perwakilan dengan jumlah konten lokal terbanyak di Pulau Jawa, yaitu mencapai 52 konten lokal dari total 59 post.",
+  "Stabilitas nilai tukar menjadi topik yang paling sedikit diunggah oleh seluruh kantor perwakilan dengan total hanya 7 post dan rata-rata 102 engagement per post."
  ],
  "kpw": [
   {
-   "username": "@bank_indonesia_jabar",
-   "narasi": "KPw Jawa Barat berfokus pada topik ekonomi dan keuangan syariah dengan total 13 post. Salah satu program khasnya adalah penyelenggaraan Lomba Desain Grafis QRIS pada rangkaian acara Bandung QRIS Art & Culinary 2026."
-  },
-  {
    "username": "@bank_indonesia_jateng",
-   "narasi": "KPw Jawa Tengah mendominasi unggahannya pada topik ekonomi dan keuangan syariah sebanyak 12 post. Ciri khas kegiatan daerah ini ditunjukkan melalui penyaluran donasi dari acara Lari Rupiah Borobudur Playon 2026 untuk pengelolaan sampah di Magelang."
+   "narasi": "KPw Provinsi Jawa Tengah paling berfokus pada topik Ekonomi & keuangan syariah dengan 12 post dari total 63 unggahan. Salah satu program khasnya adalah penyaluran donasi donasi Rp633 juta dari acara Lari Rupiah Borobudur Playon 2026 untuk 10 TPS3R di Magelang."
   },
   {
-   "username": "@bank_indonesia_purwokerto",
-   "narasi": "KPw Purwokerto memberikan porsi konten utama pada topik ekonomi dan keuangan syariah sejumlah 13 post. Kantor ini banyak mempublikasikan kegiatan kelembagaan seperti Upacara Pengukuhan Aswin Gantina sebagai Kepala Perwakilan BI Purwokerto yang baru."
+   "username": "@bank_indonesia_banten",
+   "narasi": "KPw Provinsi Banten menjadikan Ekonomi & keuangan syariah sebagai topik utama dengan 8 post. Kantor perwakilan ini aktif mempublikasikan ajang Jawara Banten Run 5K 2026 yang dimeriahkan bazaar UMKM serta edukasi keuangan."
   },
   {
    "username": "@bank_indonesia_solo",
-   "narasi": "KPw Solo paling banyak mengunggah topik pengelolaan uang Rupiah yang mencapai 14 post. Program khasnya mencakup penyediaan layanan kas keliling penukaran uang logam Rupiah GAUL di berbagai wilayah."
+   "narasi": "KPw Solo sangat mendominasi kontennya pada Pengelolaan uang Rupiah yang mencapai 14 post. Program khas yang dijalankan yaitu pembukaan layanan kas keliling penukaran uang logam Rupiah GAUL di berbagai daerah."
+  },
+  {
+   "username": "@bank_indonesia_jember",
+   "narasi": "KPw Jember memfokuskan unggahannya pada Ekonomi & keuangan syariah sebanyak 9 post. Salah satu kegiatannya meliputi pelatihan Public Speaking Skills for Future Leaders bagi anggota GenBI Jember 2026."
+  },
+  {
+   "username": "@bank_indonesia_kediri",
+   "narasi": "KPw Kediri berfokus pada Sistem pembayaran & QRIS melalui 7 post yang mendulang engagement tinggi. Contoh program interaktifnya adalah gelaran Kuis Kubik mengenai 6 negara mitra QRIS Antarnegara."
+  },
+  {
+   "username": "@bank_indonesia_jabar",
+   "narasi": "KPw Provinsi Jawa Barat berfokus pada Ekonomi & keuangan syariah dengan 13 post, namun topik Sistem pembayaran & QRIS berhasil meraih engagement tertinggi. Kantor ini menggelar ajang kreatif Bandung QRIS Art & Culinary 2026 beserta podcast Braga 108."
   },
   {
    "username": "@bank_indonesia_cirebon",
-   "narasi": "KPw Cirebon memfokuskan konten pada topik ekonomi dan keuangan syariah yang mencapai 8 post. Ciri khas program lokalnya adalah kegiatan edukasi urban farming hingga pengelolaan sampah organik oleh GenBI Ciayumajakuning untuk mendukung pengendalian inflasi."
+   "narasi": "KPw Cirebon mengutamakan topik Ekonomi & keuangan syariah yang disajikan dalam 8 post. Contoh kegiatannya adalah edukasi Kebanksentralan dan CBP Rupiah yang disertai pembagian bibit cabai di Pasar Renteng Cibogo Kuningan."
   },
   {
-   "username": "@bank_indonesia_tasikmalaya",
-   "narasi": "KPw Tasikmalaya berfokus pada topik ekonomi dan keuangan syariah dengan jumlah 13 post. Kantor ini aktif menggelar acara daerah seperti festival Sawarga Tasikmalaya yang diisi pameran UMKM dan kompetisi kreatif."
+   "username": "@bank_indonesia_purwokerto",
+   "narasi": "KPw Purwokerto memfokuskan konten pada Ekonomi & keuangan syariah dengan jumlah 13 post. Momen penting perwakilan ini adalah serangkaian upacara pengukuhan Aswin Gantina sebagai Kepala Perwakilan BI Purwokerto yang baru."
+  },
+  {
+   "username": "@bank_indonesia_jatim",
+   "narasi": "KPw Provinsi Jawa Timur mengusung Ekonomi & keuangan syariah sebagai topik utama dengan 9 post. Program unggulannya mencakup kompetisi riset EJAVEC Forum 2026 dan sosialisasi program Ayo Peduli Koin (APIK)."
+  },
+  {
+   "username": "@bank_indonesia_kpwdiy",
+   "narasi": "KPw Provinsi DI Yogyakarta fokus pada Sistem pembayaran & QRIS dengan 7 post unggahan. Perwakilan ini aktif mengadakan ajang kolaboratif seperti Panggung QRAPYAK 2026 dan kompetisi edukasi LIGA MRANTASI 2026."
+  },
+  {
+   "username": "@bank_indonesia_malang",
+   "narasi": "KPw Malang didominasi oleh topik Edukasi & GenBI yang mencapai 12 post. Program menarik yang dihadirkan meliputi talkshow bedah buku Aroma Karsa bersama Dee Lestari dalam ajang Lentera Fest."
+  },
+  {
+   "username": "@bankindonesia_tasikmalaya",
+   "narasi": "KPw Tasikmalaya menaruh fokus utama pada Ekonomi & keuangan syariah lewat 13 post unggahan. Kantor perwakilan ini sukses memeriahkan wilayahnya melalui gelaran Sawarga Tasikmalaya dan ajang musik daur ulang Green Percussion."
+  },
+  {
+   "username": "@bank_indonesia_jakarta",
+   "narasi": "KPw Provinsi DKI Jakarta sangat berfokus pada Perekonomian daerah dengan porsi mencapai 21 post. Ciri khas utamanya adalah keterlibatan aktif dalam mendukung industri kreatif melalui gelaran Jakarta Film Summit 2026."
   },
   {
    "username": "@bank_indonesia_tegal",
-   "narasi": "KPw Tegal paling banyak mengangkat topik sistem pembayaran dan QRIS yakni sebanyak 7 post. Salah satu pencapaian khasnya adalah penerimaan penghargaan dari Kementerian Perdagangan atas pengembangan ekosistem wastra batik berkelanjutan."
+   "narasi": "KPw Tegal paling sering mengangkat topik Sistem pembayaran & QRIS dengan total 8 post. Kantor ini menunjukkan prestasinya dengan meraih penghargaan dari Kementerian Perdagangan atas pengembangan Wastra Batik Berkelanjutan."
   }
  ]
 }

@@ -1,5 +1,19 @@
 [
  {
+  "provinsi": "DKI Jakarta",
+  "kpw": "Provinsi DKI Jakarta",
+  "kpw_pendek": "DKI Jakarta",
+  "username": "bank_indonesia_jakarta",
+  "url": "https://www.instagram.com/bank_indonesia_jakarta/"
+ },
+ {
+  "provinsi": "Banten",
+  "kpw": "Provinsi Banten",
+  "kpw_pendek": "Banten",
+  "username": "bank_indonesia_banten",
+  "url": "https://www.instagram.com/bank_indonesia_banten/"
+ },
+ {
   "provinsi": "Jawa Barat",
   "kpw": "Provinsi Jawa Barat",
   "kpw_pendek": "Jawa Barat",
@@ -47,5 +61,40 @@
   "kpw_pendek": "Tegal",
   "username": "bank_indonesia_tegal",
   "url": "https://www.instagram.com/bank_indonesia_tegal/"
+ },
+ {
+  "provinsi": "DI Yogyakarta",
+  "kpw": "Provinsi DI Yogyakarta",
+  "kpw_pendek": "DI Yogyakarta",
+  "username": "bank_indonesia_kpwdiy",
+  "url": "https://www.instagram.com/bank_indonesia_kpwdiy/"
+ },
+ {
+  "provinsi": "Jawa Timur",
+  "kpw": "Provinsi Jawa Timur",
+  "kpw_pendek": "Jawa Timur",
+  "username": "bank_indonesia_jatim",
+  "url": "https://www.instagram.com/bank_indonesia_jatim/"
+ },
+ {
+  "provinsi": "Jawa Timur",
+  "kpw": "Malang",
+  "kpw_pendek": "Malang",
+  "username": "bank_indonesia_malang",
+  "url": "https://www.instagram.com/bank_indonesia_malang/"
+ },
+ {
+  "provinsi": "Jawa Timur",
+  "kpw": "Kediri",
+  "kpw_pendek": "Kediri",
+  "username": "bank_indonesia_kediri",
+  "url": "https://www.instagram.com/bank_indonesia_kediri/"
+ },
+ {
+  "provinsi": "Jawa Timur",
+  "kpw": "Jember",
+  "kpw_pendek": "Jember",
+  "username": "bank_indonesia_jember",
+  "url": "https://www.instagram.com/bank_indonesia_jember/"
  }
 ]

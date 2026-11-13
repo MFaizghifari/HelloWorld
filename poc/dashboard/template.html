@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<title>Monitor Sosmed KPw BI</title>
+<title>Social Listening KPw BI</title>
 <style>
 :root{
   color-scheme:light;
   --ink:#0D1626; --ink-2:#4A5568; --ink-3:#7B8494;
   --canvas:#F6F7F9; --surface:#FFFFFF; --surface-2:#F1F3F6; --line:#E4E7EC; --line-2:#D5DAE1;
   --navy:#0A3A7E; --navy-ink:#FFFFFF; --focus:#1F5BB5;
-  --s-jabar:#1F5BB5; --s-jateng:#008F86;
+  --s-jabar:#2a78d6; --s-jateng:#1baf7a; --p-dki:#e87ba4; --p-banten:#008300; --p-jabar:#2a78d6; --p-jateng:#1baf7a; --p-diy:#eb6834; --p-jatim:#6250d6;
   --heat:#1F5BB5; --soft:#EEF3FB;
   --grid:rgba(13,22,38,.07);
   --shadow:0 1px 2px rgba(13,22,38,.04),0 1px 1px rgba(13,22,38,.03);
@@ -30,7 +30,7 @@
     --ink:#E9EDF3; --ink-2:#AAB4C3; --ink-3:#7E8899;
     --canvas:#0B111C; --surface:#111A2B; --surface-2:#172235; --line:#1F2B40; --line-2:#2A3850;
     --navy:#4F8DEB; --navy-ink:#081226; --focus:#4F8DEB;
-    --s-jabar:#4F8DEB; --s-jateng:#13A896; --heat:#4F8DEB; --soft:#14223A;
+    --s-jabar:#3987e5; --s-jateng:#199e70; --p-dki:#d55181; --p-banten:#008300; --p-jabar:#3987e5; --p-jateng:#199e70; --p-diy:#d95926; --p-jatim:#9085e9; --heat:#4F8DEB; --soft:#14223A;
     --grid:rgba(233,237,243,.07); --shadow:none; --shadow-lg:0 12px 32px -12px rgba(0,0,0,.6);
   }
 }
@@ -39,7 +39,7 @@
   --ink:#E9EDF3; --ink-2:#AAB4C3; --ink-3:#7E8899;
   --canvas:#0B111C; --surface:#111A2B; --surface-2:#172235; --line:#1F2B40; --line-2:#2A3850;
   --navy:#4F8DEB; --navy-ink:#081226; --focus:#4F8DEB;
-  --s-jabar:#4F8DEB; --s-jateng:#13A896; --heat:#4F8DEB; --soft:#14223A;
+  --s-jabar:#3987e5; --s-jateng:#199e70; --p-dki:#d55181; --p-banten:#008300; --p-jabar:#3987e5; --p-jateng:#199e70; --p-diy:#d95926; --p-jatim:#9085e9; --heat:#4F8DEB; --soft:#14223A;
   --grid:rgba(233,237,243,.07); --shadow:none; --shadow-lg:0 12px 32px -12px rgba(0,0,0,.6);
 }
 *{box-sizing:border-box}
@@ -62,7 +62,7 @@ code{font-family:var(--mono);font-size:.85em}
 :root[data-theme="dark"] .logo-light{display:none!important}
 :root[data-theme="dark"] .logo-dark{display:block!important}
 .appnav{display:flex;gap:2px;margin-left:auto}
-.appnav a{color:var(--ink-2);text-decoration:none;font-size:.86rem;font-weight:500;padding:6px 11px;border-radius:8px}
+.appnav a{white-space:nowrap;color:var(--ink-2);text-decoration:none;font-size:.86rem;font-weight:500;padding:6px 11px;border-radius:8px}
 .appnav a:hover{color:var(--ink);background:var(--surface-2)}
 .poc{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line-2);border-radius:6px;padding:3px 8px;flex:none}
 
@@ -232,7 +232,37 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;p
 .topics .defs dt{white-space:normal;max-width:150px}
 select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:5px 28px 5px 10px;appearance:none;-webkit-appearance:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px;background-repeat:no-repeat}
 
-@media (max-width:1020px){.flow{grid-template-columns:1fr 1fr}.flow li:nth-child(3){border-left:0}.flow li:nth-child(n+3){border-top:1px solid var(--line)}.mgrid{grid-template-columns:1fr}.appnav{display:none}.kpis{grid-template-columns:repeat(3,1fr)}.tile:nth-child(4){border-left:0}.tile:nth-child(n+4){border-top:1px solid var(--line)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}.sr-grid{grid-template-columns:1fr}.insight ul{grid-template-columns:1fr}}
+
+.kpis4{grid-template-columns:repeat(4,1fr)}
+.lk{color:var(--ink);font-weight:700}
+.camp td.c{min-width:52px;position:relative}
+.camp td.c .lk{position:absolute;top:1px;right:5px;font-size:.9rem;line-height:1}
+.camp td.c.early{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--heat) 22%,var(--surface)) 0 4px,var(--surface) 4px 8px)}
+.camp td.tl{white-space:normal;min-width:220px;max-width:280px}
+.camp td.tl small{display:block;color:var(--ink-3);font-weight:400;font-size:.74rem}
+.camp tr.sum td{border-top:1px solid var(--line-2);font-weight:600;color:var(--ink-2);text-align:center;font-size:.78rem}
+.issue{border-top:1px solid var(--line);padding:11px 2px}
+.issue:first-child{border-top:0}
+.issue summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:baseline}
+.issue summary::-webkit-details-marker{display:none}
+.issue summary b{font-weight:600}
+.issue summary .n{font-family:var(--display);font-weight:600;font-variant-numeric:tabular-nums}
+.issue p{margin:2px 0 0;color:var(--ink-2);font-size:.84rem}
+.issue .where{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.issue blockquote{margin:8px 0 0;padding:6px 10px;border-left:2px solid var(--line-2);color:var(--ink-2);font-size:.82rem}
+.issue blockquote small{display:block;color:var(--ink-3);font-size:.72rem}
+.stack{display:flex;gap:2px;height:10px;border-radius:3px;overflow:hidden;min-width:80px;background:var(--surface-2)}
+.stack i{display:block;height:100%}
+.k-q{background:var(--heat)} .k-c{background:#e34948} .k-s{background:color-mix(in srgb,var(--heat) 45%,var(--surface))} .k-a{background:var(--p-jateng)} .k-o{background:var(--line-2)}
+.cm{display:grid;grid-template-columns:1fr auto;gap:12px;padding:11px 8px;border-top:1px solid var(--line);text-decoration:none;color:inherit}
+.posts .cm:first-child{border-top:0}
+.cm:hover{background:var(--surface-2)}
+.cm .tx{font-size:.88rem}
+.cm .pm{font-size:.76rem;color:var(--ink-2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.cm .lks{font-size:.76rem;color:var(--ink-3);white-space:nowrap}
+
+@media (max-width:1120px){.appnav{display:none}}
+@media (max-width:1020px){.kpis4{grid-template-columns:repeat(2,1fr)}.kpis4 .tile:nth-child(3){border-left:0}.kpis4 .tile:nth-child(n+3){border-top:1px solid var(--line)}.flow{grid-template-columns:1fr 1fr}.flow li:nth-child(3){border-left:0}.flow li:nth-child(n+3){border-top:1px solid var(--line)}.mgrid{grid-template-columns:1fr}.appnav{display:none}.kpis{grid-template-columns:repeat(3,1fr)}.tile:nth-child(4){border-left:0}.tile:nth-child(n+4){border-top:1px solid var(--line)}.grid2{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}.sr-grid{grid-template-columns:1fr}.insight ul{grid-template-columns:1fr}}
 @media (max-width:600px){
   .flow{grid-template-columns:1fr}.flow li{border-left:0!important}.flow li+li{border-top:1px solid var(--line)}
   .wrap{padding:0 16px}.appbar .wrap{gap:10px}.poc{display:none}.cobrand img{height:22px}
@@ -258,7 +288,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
       <img class="logo-dark" src="__LOGO_BL_WHITE__" alt="Belajarlagi">
     </div>
     <nav class="appnav" aria-label="Bagian halaman">
-      <a href="#ringkasan">Ringkasan</a><a href="#topik">Topik</a><a href="#engagement">Engagement</a><a href="#unggahan">Unggahan</a><a href="#metodologi">Metodologi</a>
+      <a href="#topik">Topik</a><a href="#kampanye">Kampanye</a><a href="#suara">Suara publik</a><a href="#engagement">Engagement</a><a href="#unggahan">Unggahan</a><a href="#metodologi">Metodologi</a>
     </nav>
     <span class="poc">Proof of concept</span>
   </div>
@@ -269,14 +299,12 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
     <div class="phead">
       <div>
         <div class="meta" id="heroMeta"></div>
-        <h1>Instagram KPw Bank Indonesia di Jawa Barat &amp; Jawa Tengah</h1>
-        <p>Apa yang diunggah 7 kantor perwakilan, topik apa yang diangkat, dan seberapa besar respons publiknya.</p>
+        <h1>Monitoring &amp; Social Listening Tools KPw Bank Indonesia</h1>
+        <p id="heroSub">Apa yang diunggah kantor perwakilan, topik dan kampanye apa yang diangkat, dan bagaimana respons publiknya.</p>
       </div>
       <div class="filters" role="group" aria-label="Filter provinsi">
         <span class="lbl">Provinsi</span>
         <button class="chip" data-prov="all" aria-pressed="true">Semua</button>
-        <button class="chip" data-prov="Jawa Barat" aria-pressed="false"><span class="dot" style="background:var(--s-jabar)"></span>Jawa Barat</button>
-        <button class="chip" data-prov="Jawa Tengah" aria-pressed="false"><span class="dot" style="background:var(--s-jateng)"></span>Jawa Tengah</button>
       </div>
     </div>
 
@@ -339,6 +367,44 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
       <div class="aig" id="aiKpw"></div>
     </section>
 
+
+    <div class="sec" id="kampanye"><h2>Amplifikasi kampanye nasional<span class="ai-pill">Gemini</span></h2><p id="campSub">Pesan dari akun pusat @bank_indonesia dan KPw yang ikut menyebarkannya</p></div>
+    <section class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <div>
+          <h2>Pesan pusat yang diikuti KPw</h2>
+          <div class="sub">Kebijakan dan rilis diukur dari kecepatannya (H+0 = di hari yang sama dengan unggahan pusat). Kampanye dan program diukur dari jumlah unggahan. Tanda <span class="lk">•</span> berarti KPw juga menggelar kegiatan lokal untuk pesan itu. Klik sel untuk melihat unggahannya.</div>
+        </div>
+      </div>
+      <div class="tscroll"><table class="heat camp" id="camp"></table></div>
+      <div id="campPosts" style="margin-top:14px"></div>
+    </section>
+
+    <div class="sec" id="suara"><h2>Suara publik<span class="ai-pill">Gemini</span></h2><p id="voiceSub">Komentar di unggahan KPw, dikelompokkan AI</p></div>
+    <div class="kpis kpis4" id="voiceTiles" role="list"></div>
+    <div class="grid2">
+      <section class="card">
+        <h2>Isu yang sering muncul di komentar</h2>
+        <div class="sub">Pertanyaan, keluhan, dan permintaan publik yang berulang. Klik untuk melihat contoh komentarnya.</div>
+        <div id="issues"></div>
+      </section>
+      <section class="card">
+        <h2>Jenis komentar per KPw</h2>
+        <div class="sub">Komposisi komentar yang dianalisis, urut dari yang paling banyak pertanyaan + keluhan</div>
+        <div class="tscroll"><table id="voiceTbl"></table></div>
+        <div class="legend" id="voiceLegend"></div>
+      </section>
+    </div>
+    <section class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <div>
+          <h2>Komentar yang sebaiknya dijawab</h2>
+          <div class="sub">Pertanyaan nyata, keluhan, dan laporan penipuan yang ditandai AI. Data publik tidak memuat balasan admin, jadi status sudah/belum dijawab perlu dicek di Instagram.</div>
+        </div>
+        <select class="kpw" id="respKpw" aria-label="Pilih KPw"></select>
+      </div>
+      <div class="posts" id="respList"></div>
+    </section>
     <div class="sec" id="engagement"><h2>Engagement</h2><p>Likes + komentar pada unggahan dalam periode</p></div>
 
     <div class="grid2">
@@ -355,7 +421,7 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
           </div>
         </div>
         <div class="chart"><canvas id="barChart" aria-label="Grafik batang engagement per KPw"></canvas></div>
-        <div class="legend"><span><i style="background:var(--s-jabar)"></i>Jawa Barat</span><span><i style="background:var(--s-jateng)"></i>Jawa Tengah</span></div>
+        <div class="legend" id="barLegend"></div>
       </section>
       <section class="card">
         <h2>Engagement harian</h2>
@@ -420,6 +486,18 @@ select.kpw{font:inherit;font-size:.8rem;color:var(--ink);background:var(--surfac
             <li><b>Pencarian</b> bekerja dua tahap: unggahan diurutkan menurut kemiripan makna dengan kata yang dicari (embedding), lalu 60 kandidat teratas dinilai AI sebagai <i>topik utama</i>, <i>menyinggung</i>, atau tidak relevan.</li>
             <li>Karena tujuannya berbeda, "utama" di hasil pencarian bisa lebih banyak daripada di peta topik. Peta topik memberi tepat satu topik utama per unggahan, sedangkan pencarian menilai apakah topik yang dicari menjadi inti unggahan, walaupun unggahan itu juga membahas hal lain.</li>
           </ul>
+          <h3 style="margin-top:18px">Amplifikasi kampanye</h3>
+          <ul>
+            <li>AI membaca unggahan akun pusat <b>@bank_indonesia</b> dalam periode yang sama dan menyusun daftar pesan nasional (kebijakan, kampanye edukasi, program/acara). Ucapan hari besar dan konten hiburan tidak dihitung.</li>
+            <li>Setiap unggahan KPw dicocokkan ke salah satu pesan itu sebagai <b>materi pusat</b> (membagikan/mengadaptasi materi) atau <b>kegiatan lokal</b> (kegiatan di daerah sebagai bagian kampanye).</li>
+            <li>Untuk <b>kebijakan dan rilis</b>, jeda = selisih hari kalender (WIB) antara unggahan KPw pertama dan unggahan pusat terakhir sebelumnya. "Lebih awal" berarti KPw mengunggah sebelum akun pusat. Untuk <b>kampanye dan program</b> yang berlangsung terus, yang dihitung adalah jumlah unggahan, karena jeda tidak bermakna.</li>
+          </ul>
+          <h3 style="margin-top:18px">Suara publik</h3>
+          <ul>
+            <li>Komentar diambil dari komentar terbaru yang tampil di tiap unggahan (hingga ±12 per unggahan), jadi merupakan <b>sampel</b>, bukan seluruh komentar. Komentar dari akun KPw sendiri tidak dihitung.</li>
+            <li>AI memberi setiap komentar satu kategori (pertanyaan, keluhan, saran/permintaan, apresiasi, kuis/tag teman, spam/promosi, lainnya), sentimen, pokok isu, dan tanda perlu dijawab. Isu berulang dikelompokkan dari pertanyaan, keluhan, dan saran.</li>
+            <li>Persentase sentimen dihitung tanpa komentar kuis, spam, dan lainnya agar tidak tertutup komentar yang tidak bermakna.</li>
+          </ul>
           <details class="topics">
             <summary>Lihat 12 topik dan definisinya</summary>
             <dl class="defs" id="mTopics"></dl>
@@ -446,8 +524,11 @@ const fmtPct = n => n.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFra
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 const fmtD = s => { const [y,m,d] = s.split('-'); return +d + ' ' + MONTHS[+m-1]; };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const provColor = p => css(p === 'Jawa Barat' ? '--s-jabar' : '--s-jateng');
-const PROVS = ['Jawa Barat','Jawa Tengah'];
+const PVAR = {'DKI Jakarta':'--p-dki','Banten':'--p-banten','Jawa Barat':'--p-jabar','Jawa Tengah':'--p-jateng','DI Yogyakarta':'--p-diy','Jawa Timur':'--p-jatim'};
+const provColor = p => css(PVAR[p] || '--ink-3');
+const PROVS = DATA.provinces;
+document.querySelector('.filters').insertAdjacentHTML('beforeend', PROVS.map(p => `<button class="chip" data-prov="${p}" aria-pressed="false"><span class="dot" style="background:var(${PVAR[p]})"></span>${p.replace('DI Yogyakarta','DIY').replace('DKI Jakarta','DKI')}</button>`).join(''));
+document.getElementById('barLegend').innerHTML = PROVS.map(p => `<span><i style="background:var(${PVAR[p]})"></i>${p}</span>`).join('');
 let prov = 'all', metric = 'engagement', sortK = 'engagement', sortDir = -1;
 const charts = {};
 
@@ -458,14 +539,14 @@ const M = {
 };
 
 document.getElementById('heroMeta').innerHTML = [
-  'Instagram', '7 akun KPw', fmtD(DATA.period.start) + ' – ' + fmtD(DATA.period.end) + ' 2026', fmtN(DATA.posts.length) + ' unggahan'
+  'Instagram', DATA.summary.length + ' akun KPw di Pulau Jawa', fmtD(DATA.period.start) + ' – ' + fmtD(DATA.period.end) + ' 2026', fmtN(DATA.posts.length) + ' unggahan'
 ].map(s => '<span>' + s + '</span>').join('');
 document.getElementById('gen').textContent = 'Data ditarik ' + DATA.generated;
 document.getElementById('heroMeta').insertAdjacentHTML('beforeend', '<span>Data per ' + DATA.generated.replace(/^(\d{4})-(\d{2})-(\d{2})/, (m,y,mo,d) => +d + ' ' + MONTHS[+mo-1] + ' ' + y) + '</span>');
 (() => {
   const li = xs => xs.map(x => '<li>' + x + '</li>').join('');
   const period = fmtD(DATA.period.start) + ' – ' + fmtD(DATA.period.end) + ' 2026';
-  document.getElementById('mFlow1').textContent = 'Unggahan publik dan profil 7 akun Instagram resmi KPw ditarik otomatis dengan scraper data publik pada ' + DATA.generated.replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/, (m,y,mo,d,h,mi) => +d + ' ' + MONTHS[+mo-1] + ' ' + y + ' pukul ' + h + '.' + mi) + '.';
+  document.getElementById('mFlow1').textContent = 'Unggahan publik dan profil ' + DATA.summary.length + ' akun Instagram resmi KPw serta akun pusat @bank_indonesia ditarik otomatis dengan scraper data publik pada ' + DATA.generated.replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/, (m,y,mo,d,h,mi) => +d + ' ' + MONTHS[+mo-1] + ' ' + y + ' pukul ' + h + '.' + mi) + '.';
   document.getElementById('mScope').innerHTML = li([
     '<b>Platform:</b> Instagram (feed, carousel, dan Reels).',
     '<b>Periode:</b> ' + period + ', menurut tanggal unggah (WIB).',
@@ -666,7 +747,7 @@ function renderPosts(){
     <span class="ev">${fmtN(p.engagement)}<small>${fmtN(p.likes)} likes · ${fmtN(p.comments)} komentar</small></span></a>`).join('');
 }
 
-function renderAll(){ renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); renderHeat(); renderAI(); if (lastSearch) renderSearch(); }
+function renderAll(){ renderCamp(); renderVoice(); renderTiles(); renderInsight(); renderBar(); renderLine(); renderFmt(); renderTable(); renderPosts(); renderHeat(); renderAI(); if (lastSearch) renderSearch(); }
 
 document.querySelectorAll('.filters .chip').forEach(b => b.addEventListener('click', () => {
   prov = b.dataset.prov;
@@ -811,6 +892,120 @@ function renderSearch(){
 }
 
 document.getElementById('fmtKpw').addEventListener('change', e => { fmtKpw = e.target.value; renderFmt(); });
+
+/* ---------- Kampanye nasional ---------- */
+let campSel = null;
+const dayLag = (a, b) => Math.round((new Date(new Date(b).toLocaleDateString('en-CA', {timeZone:'Asia/Jakarta'})) - new Date(new Date(a).toLocaleDateString('en-CA', {timeZone:'Asia/Jakarta'}))) / 864e5);
+const fmtDT = iso => { const d = new Date(iso); return d.toLocaleDateString('id-ID', {day:'numeric', month:'short', timeZone:'Asia/Jakarta'}) + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta'}); };
+function renderCamp(){
+  const C = DATA.campaigns; const tbl = document.getElementById('camp');
+  if (!C || !C.campaigns.length){ tbl.innerHTML = '<tr><td class="sub">Data kampanye belum tersedia.</td></tr>'; return; }
+  const ks = rows();
+  // policy/release: lag of the KPw's first post vs the latest pusat post before it; campaigns/programs: number of posts
+  const build = c => {
+    const isRel = c.jenis === 'kebijakan';
+    const pts = c.pusat_posts.map(pp => pp.ts).sort();
+    const cells = ks.map(k => {
+      const ps = c.kpw_posts.map(x => ({...x, p: BYID[x.id]})).filter(x => x.p && x.p.username === k.username).sort((a,b) => a.p.ts.localeCompare(b.p.ts));
+      if (!ps.length) return null;
+      const first = ps[0].p.ts, prev = pts.filter(t => t <= first).pop();
+      return {ps, n: ps.length, local: ps.some(x => x.jenis === 'kegiatan_lokal'), lag: prev ? dayLag(prev, first) : null, ref: prev};
+    });
+    const hit = cells.filter(Boolean), lags = hit.map(x => x.lag).filter(l => l !== null).sort((a,b) => a - b);
+    return {c, isRel, cells, n: hit.length, posts: hit.reduce((a,x) => a + x.n, 0), med: lags.length ? lags[Math.floor((lags.length - 1) / 2)] : null};
+  };
+  const all = C.campaigns.map(build);
+  const rel = all.filter(r => r.isRel).sort((a,b) => b.n - a.n), camp = all.filter(r => !r.isRel).sort((a,b) => b.posts - a.posts);
+  const maxN = Math.max(1, ...camp.flatMap(r => r.cells.filter(Boolean).map(x => x.n)));
+  const JEN = {kebijakan:'Kebijakan/rilis', kampanye_edukasi:'Kampanye edukasi', program_acara:'Program/acara'};
+  const order = [...rel, ...camp];
+  const head = `<thead><tr><th>Pesan pusat</th>${ks.map(k => `<th><span class="pd" style="background:${provColor(k.provinsi)}"></span>${k.kpw.replace('Prov. ','Prov.<br>')}</th>`).join('')}<th style="text-align:right">Ikut</th><th style="text-align:right">Ringkas</th></tr></thead>`;
+  const row = r => { const ri = order.indexOf(r); return `<tr><td class="tl" data-ci="${ri}">${esc(r.c.nama)}<small>${JEN[r.c.jenis] || ''} · ${r.c.pusat_posts.length} unggahan pusat, pertama ${fmtDT(r.c.pusat_first)}</small></td>${r.cells.map((x, i) => {
+      if (!x) return '<td class="c z">·</td>';
+      const sel = campSel && campSel.ci === ri && campSel.u === ks[i].username;
+      let f, label, cls = '';
+      if (r.isRel){
+        if (x.lag === null){ cls = ' early'; label = 'Lebih awal'; f = 0; }
+        else { f = Math.max(0, 1 - Math.min(x.lag, 7) / 7) * .9 + .1; label = 'H+' + x.lag; }
+      } else { f = Math.min(1, x.n / maxN) * .9 + .1; label = x.n; }
+      return `<td class="c${cls}${sel ? ' sel' : ''}" data-ci="${ri}" data-u="${ks[i].username}" data-i="${i}" style="${cls ? 'font-size:.7rem' : `background:${shade(f)};color:${f > .5 ? '#fff' : 'var(--text)'}`}">${label}${x.local ? '<span class="lk">•</span>' : ''}</td>`;
+    }).join('')}<td class="tot">${r.n}/${ks.length}</td><td class="tot">${r.isRel ? (r.med === null ? '–' : 'median H+' + r.med) : r.posts + ' unggahan'}</td></tr>`; };
+  const grp = (t, sub) => `<tr><td colspan="${ks.length + 3}" style="padding:14px 8px 4px;font-family:var(--display);font-weight:600;color:var(--ink)">${t} <span style="font-family:var(--body);font-weight:400;color:var(--ink-3);font-size:.78rem">${sub}</span></td></tr>`;
+  tbl.innerHTML = head + '<tbody>' +
+    (rel.length ? grp('Kebijakan & rilis', 'angka = jeda hari dari unggahan pusat terakhir sebelum unggahan KPw · makin gelap makin cepat') + rel.map(row).join('') : '') +
+    (camp.length ? grp('Kampanye & program', 'angka = jumlah unggahan KPw · makin gelap makin banyak') + camp.map(row).join('') : '') +
+    `<tr class="sum"><td style="text-align:left">Pesan yang diikuti</td>${ks.map((k, i) => `<td>${order.filter(r => r.cells[i]).length}/${order.length}</td>`).join('')}<td></td><td></td></tr></tbody>`;
+  document.getElementById('campSub').textContent = `${order.length} pesan nasional dari ${C.pusat_posts} unggahan @bank_indonesia, dicocokkan dengan unggahan ${ks.length} KPw`;
+  const tt = tooltipEl();
+  tbl.querySelectorAll('td.c[data-ci]').forEach(td => {
+    td.addEventListener('mousemove', ev => {
+      const r = order[+td.dataset.ci], x = r.cells[+td.dataset.i], k = ks[+td.dataset.i];
+      tt.innerHTML = `<b>${esc(r.c.nama)}</b><div style="color:var(--muted)">KPw ${k.kpw_full}</div>` +
+        (r.isRel ? `<div class="r"><span>Unggahan pusat acuan</span><b>${x.ref ? fmtDT(x.ref) : '–'}</b></div>` : '') +
+        `<div class="r"><span>Unggahan KPw pertama</span><b>${fmtDT(x.ps[0].p.ts)}</b></div><div class="r"><span>Unggahan KPw</span><b>${x.n}</b></div><div class="r"><span>Kegiatan lokal</span><b>${x.local ? 'Ya' : 'Tidak'}</b></div>` +
+        (r.isRel && x.lag === null ? '<div style="color:var(--muted);margin-top:4px">KPw mengunggah sebelum akun pusat.</div>' : '');
+      tt.style.display = 'block'; let X = ev.clientX + 14; if (X + tt.offsetWidth > innerWidth - 8) X = ev.clientX - tt.offsetWidth - 14;
+      tt.style.left = X + 'px'; tt.style.top = Math.max(8, ev.clientY - 10) + 'px';
+    });
+    td.addEventListener('mouseleave', () => { tt.style.display = 'none'; });
+    td.addEventListener('click', () => { campSel = {ci: +td.dataset.ci, u: td.dataset.u}; renderCamp(); });
+  });
+  tbl.querySelectorAll('td.tl').forEach(td => td.addEventListener('click', () => { campSel = {ci: +td.dataset.ci, u: null}; renderCamp(); }));
+  const box = document.getElementById('campPosts');
+  if (!campSel || !order[campSel.ci]){ box.innerHTML = ''; return; }
+  const r = order[campSel.ci];
+  const xs = r.c.kpw_posts.map(x => ({...x, p: BYID[x.id]})).filter(x => x.p && ks.some(k => k.username === x.p.username) && (!campSel.u || x.p.username === campSel.u)).sort((a,b) => a.p.ts.localeCompare(b.p.ts));
+  const k = campSel.u && DATA.summary.find(s => s.username === campSel.u);
+  box.innerHTML = `<div class="card-head" style="margin-bottom:8px"><div><b>${esc(r.c.nama)}</b> · ${k ? 'KPw ' + k.kpw : 'semua KPw'} · ${xs.length} unggahan<div class="sub" style="margin:2px 0 0">${esc(r.c.ringkas)} Unggahan pusat: ${r.c.pusat_posts.map(pp => `<a href="${pp.url}" target="_blank" rel="noopener">${fmtDT(pp.ts)}</a>`).join(', ')}</div></div><button class="more" id="campClose" style="margin:0">Tutup</button></div>
+    <div class="posts">${xs.map((x,i) => postRow(x.p, i, `<span class="tag ${x.jenis === 'kegiatan_lokal' ? 'main' : 'side'}">${x.jenis === 'kegiatan_lokal' ? 'Kegiatan lokal' : 'Materi pusat'}</span>`)).join('')}</div>`;
+  document.getElementById('campClose').onclick = () => { campSel = null; renderCamp(); };
+}
+
+/* ---------- Suara publik ---------- */
+let respKpw = 'all';
+const KAT = {pertanyaan:['Pertanyaan','k-q'], keluhan:['Keluhan','k-c'], saran_permintaan:['Saran/permintaan','k-s'], apresiasi:['Apresiasi','k-a'], partisipasi_kuis:['Kuis/tag teman','k-o'], spam_promosi:['Spam/promosi','k-o'], lainnya:['Lainnya','k-o']};
+function renderVoice(){
+  const V = DATA.comments; if (!V) return;
+  const ks = rows(), us = new Set(ks.map(k => k.username));
+  const items = V.items.filter(i => us.has(i.u));
+  const posts = postsF(), reported = posts.reduce((a,p) => a + p.comments, 0);
+  const n = items.length || 1, cnt = k => items.filter(i => i.k === k).length;
+  const qk = cnt('pertanyaan') + cnt('keluhan') + cnt('saran_permintaan');
+  const subst = items.filter(i => !['partisipasi_kuis','spam_promosi','lainnya'].includes(i.k));
+  const neg = subst.filter(i => i.s === 'negatif').length, pos = subst.filter(i => i.s === 'positif').length;
+  document.getElementById('voiceSub').textContent = `${fmtN(items.length)} komentar terbaru dari ${fmtN(reported)} komentar di unggahan KPw (sampel hingga ±12 komentar terbaru per unggahan)`;
+  document.getElementById('voiceTiles').innerHTML = [
+    ['Komentar dianalisis', fmtN(items.length), Math.round(items.length / (reported || 1) * 100) + '% dari total komentar'],
+    ['Pertanyaan, keluhan, saran', fmtN(qk), Math.round(qk / n * 100) + '% komentar'],
+    ['Perlu dijawab', fmtN(items.filter(i => i.r).length), 'ditandai AI'],
+    ['Sentimen negatif', subst.length ? Math.round(neg / subst.length * 100) + '%' : '–', `positif ${subst.length ? Math.round(pos / subst.length * 100) : 0}% · tanpa kuis & spam`],
+  ].map(([l,v,sb]) => `<div class="tile" role="listitem"><div class="l">${l}</div><div class="n">${v}</div><div class="s">${sb}</div></div>`).join('');
+
+  const byId = Object.fromEntries(V.items.map(i => [i.id, i]));
+  const iss = V.issues.map(x => ({...x, m: x.ids.map(id => byId[id]).filter(i => i && us.has(i.u))})).filter(x => x.m.length).sort((a,b) => b.m.length - a.m.length);
+  document.getElementById('issues').innerHTML = iss.length ? iss.map(x => {
+    const per = {}; x.m.forEach(i => per[i.u] = (per[i.u] || 0) + 1);
+    const ex = [...x.m].sort((a,b) => b.likes - a.likes).slice(0, 3);
+    return `<details class="issue"><summary><span><b>${esc(x.isu)}</b><p>${esc(x.penjelasan)}</p></span><span class="n">${x.m.length}</span></summary>
+      <div class="where">${Object.entries(per).sort((a,b) => b[1] - a[1]).map(([u,c]) => { const k = DATA.summary.find(s => s.username === u); return `<span class="tag">${k ? k.kpw : u} · ${c}</span>`; }).join('')}</div>
+      ${ex.map(i => { const p = BYID[i.post]; return `<blockquote>${esc(i.t || '')}<small>${p ? 'KPw ' + p.kpw + ' · ' + fmtD(p.date) + ' · <a href="' + p.url + '" target="_blank" rel="noopener">buka unggahan</a>' : ''}</small></blockquote>`; }).join('')}</details>`;
+  }).join('') : '<div class="sub">Belum ada isu berulang untuk filter ini.</div>';
+
+  const order = ['pertanyaan','keluhan','saran_permintaan','apresiasi','partisipasi_kuis','spam_promosi','lainnya'];
+  const rowsV = ks.map(k => { const xs = items.filter(i => i.u === k.username); const c = {}; xs.forEach(i => c[i.k] = (c[i.k] || 0) + 1); const sub = xs.filter(i => !['partisipasi_kuis','spam_promosi','lainnya'].includes(i.k)); return {k, n: xs.length, c, qk: (c.pertanyaan || 0) + (c.keluhan || 0) + (c.saran_permintaan || 0), neg: sub.length ? sub.filter(i => i.s === 'negatif').length / sub.length : 0}; })
+    .sort((a,b) => b.qk - a.qk || b.n - a.n);
+  document.getElementById('voiceTbl').innerHTML = `<thead><tr><th>KPw</th><th>Komentar</th><th style="text-align:left">Komposisi</th><th>Tanya/keluh</th><th>Negatif</th></tr></thead><tbody>` +
+    rowsV.map(r => `<tr><td><div class="kp"><i style="background:${provColor(r.k.provinsi)}"></i>${r.k.kpw}</div></td><td>${r.n}</td><td style="text-align:left"><div class="stack">${order.map(o => r.c[o] ? `<i class="${KAT[o][1]}" style="width:${r.c[o] / r.n * 100}%" title="${KAT[o][0]}: ${r.c[o]}"></i>` : '').join('')}</div></td><td><b>${r.qk}</b></td><td>${r.n ? Math.round(r.neg * 100) + '%' : '–'}</td></tr>`).join('') + '</tbody>';
+  document.getElementById('voiceLegend').innerHTML = `<span><i class="k-q"></i>Pertanyaan</span><span><i class="k-c"></i>Keluhan</span><span><i class="k-s"></i>Saran/permintaan</span><span><i class="k-a"></i>Apresiasi</span><span><i class="k-o"></i>Kuis, spam, lainnya</span>`;
+
+  const sel = document.getElementById('respKpw');
+  if (respKpw !== 'all' && !us.has(respKpw)) respKpw = 'all';
+  sel.innerHTML = '<option value="all">Semua KPw</option>' + ks.map(k => `<option value="${k.username}">KPw ${k.kpw}</option>`).join(''); sel.value = respKpw;
+  const resp = items.filter(i => i.r && (respKpw === 'all' || i.u === respKpw)).sort((a,b) => (b.k === 'keluhan') - (a.k === 'keluhan') || b.likes - a.likes);
+  document.getElementById('respList').innerHTML = resp.length ? resp.slice(0, 30).map(i => { const p = BYID[i.post]; return `<a class="cm" href="${p ? p.url : '#'}" target="_blank" rel="noopener"><div><div class="tx">${esc(i.t || '')}</div><div class="pm"><span class="tag ${i.k === 'keluhan' ? 'main' : 'side'}">${KAT[i.k][0]}</span>${i.isu ? `<span class="tag">${esc(i.isu)}</span>` : ''}<span>KPw ${p ? p.kpw : ''} · unggahan ${p ? fmtD(p.date) : ''}</span></div></div><div class="lks">${i.likes ? i.likes + ' suka' : ''}</div></a>`; }).join('') + (resp.length > 30 ? `<div class="sub" style="padding:8px">Menampilkan 30 dari ${resp.length}.</div>` : '') : '<div class="sub">Tidak ada komentar yang ditandai untuk filter ini.</div>';
+}
+document.getElementById('respKpw').addEventListener('change', e => { respKpw = e.target.value; renderVoice(); });
+
 document.getElementById('srForm').addEventListener('submit', e => { e.preventDefault(); doSearch(document.getElementById('srQ').value); });
 document.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => doSearch(b.textContent)));
 document.querySelectorAll('#heatMode button').forEach(b => b.addEventListener('click', () => {
